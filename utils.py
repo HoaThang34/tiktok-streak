@@ -52,6 +52,45 @@ def save_config(config):
         os.environ["MESSAGE"] = config["message"]
 
 
+def render_message_template(template: str, friend: dict = None) -> str:
+    """
+    Thay thế các thẻ template thời gian và thông tin bạn bè vào nội dung tin nhắn.
+    Hỗ trợ:
+      - {time}: Giờ:Phút:Giây (VD: 15:30:45)
+      - {date}: Ngày/Tháng/Năm (VD: 30/09/2026)
+      - {datetime}: Ngày giờ đầy đủ (VD: 15:30:45 30/09/2026)
+      - {hour}: Giờ hiện tại (VD: 15)
+      - {minute}: Phút hiện tại (VD: 30)
+      - {second}: Giây hiện tại (VD: 45)
+      - {nickname}: Tên hiển thị của người nhận
+      - {username}: TikTok Handle của người nhận
+    """
+    if not template:
+        return ""
+
+    now = time.localtime()
+    friend = friend or {}
+    nick = friend.get("nickname") or friend.get("username") or ""
+    uname = friend.get("username") or ""
+
+    tags = {
+        "{time}": time.strftime("%H:%M:%S", now),
+        "{date}": time.strftime("%d/%m/%Y", now),
+        "{datetime}": time.strftime("%H:%M:%S %d/%m/%Y", now),
+        "{hour}": time.strftime("%H", now),
+        "{minute}": time.strftime("%M", now),
+        "{second}": time.strftime("%S", now),
+        "{nickname}": nick,
+        "{username}": uname,
+    }
+
+    result = template
+    for tag, val in tags.items():
+        result = result.replace(tag, str(val))
+    return result
+
+
+
 def load_friends():
     """
     Tải danh sách bạn bè từ friends.json (hoặc friends.csv).
@@ -138,7 +177,7 @@ def login_with_cookies(browser, wait, cookie_file="cookies.json", log_cb=print):
     if not os.path.exists(cookie_file):
         raise FileNotFoundError(
             f"Không tìm thấy file '{cookie_file}'. "
-            f"Vui lòng chạy 'python save-cookies.py' để lưu cookies trước."
+            f"Vui lòng bấm 'Đăng nhập / Cập nhật Cookies' trên giao diện Dashboard trước."
         )
 
     log_cb("[1/3] Đang mở trang TikTok...")
@@ -374,7 +413,8 @@ def send_messages_to_selected(browser, wait, message=None, delay_sec=3, log_cb=p
                 continue
 
             target_friend = selected_targets[u_lower]
-            log_cb(f"-> Đang gửi tin nhắn cho: {target_friend['nickname']} (@{username})...")
+            actual_msg = render_message_template(msg_text, target_friend)
+            log_cb(f"-> Đang gửi tin nhắn cho: {target_friend['nickname']} (@{username}): \"{actual_msg}\"")
 
             # Tìm khung soạn thảo tin nhắn
             input_selectors = [
@@ -395,11 +435,11 @@ def send_messages_to_selected(browser, wait, message=None, delay_sec=3, log_cb=p
             if message_box:
                 message_box.click()
                 time.sleep(0.5)
-                message_box.send_keys(msg_text)
+                message_box.send_keys(actual_msg)
                 message_box.send_keys(Keys.RETURN)
                 
-                # Cập nhật trạng thái
-                current_time = time.strftime("%H:%M:%S")
+                # Cập nhật trạng thái kèm thời gian + ngày gửi lần cuối
+                current_time = time.strftime("%H:%M:%S %d/%m/%Y")
                 target_friend["status"] = f"Đã gửi ({current_time})"
                 save_friends(all_friends)
                 
@@ -415,17 +455,3 @@ def send_messages_to_selected(browser, wait, message=None, delay_sec=3, log_cb=p
             log_cb(f"   [Lỗi] Không thể gửi cho mục {idx}: {e}")
 
     log_cb(f"[Hoàn thành] Đã gửi tin nhắn cho {sent_count}/{len(selected_targets)} bạn bè được chọn.")
-
-
-# ----------------------------
-# CÁC HÀM CŨ ĐỂ TƯƠNG THÍCH NGƯỢC
-# ----------------------------
-
-def get_all_friends(browser, wait):
-    scan_friends(browser, wait, log_cb=print)
-    browser.quit()
-
-
-def auto_send_message(browser, wait):
-    send_messages_to_selected(browser, wait, log_cb=print)
-    browser.quit()

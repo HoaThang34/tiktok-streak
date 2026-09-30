@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TikTok Streak Manager - Local Dashboard</title>
+  <title>Công cụ tự động giữ chuỗi Tiktok - Local Dashboard</title>
   <style>
     /* shadcn/ui Light Mode Design Tokens */
     :root {
@@ -204,6 +204,67 @@
     }
     .form-input:focus {
       border-color: var(--ring);
+    }
+
+    /* Template Tags & Preview */
+    .template-tags-wrapper {
+      margin-top: 8px;
+    }
+    .template-tags-title {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--muted-foreground);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .template-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .template-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 11px;
+      color: var(--foreground);
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .template-chip:hover {
+      background: #e2e8f0;
+      border-color: #cbd5e1;
+    }
+    .template-chip .chip-desc {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 10px;
+      color: var(--muted-foreground);
+    }
+    .message-preview-box {
+      margin-top: 8px;
+      padding: 8px 12px;
+      background: #f8fafc;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      font-size: 12px;
+      color: var(--muted-foreground);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 36px;
+      word-break: break-word;
+    }
+    .message-preview-text {
+      color: var(--foreground);
+      font-weight: 500;
     }
 
     .form-row {
@@ -492,8 +553,8 @@
       <div class="header-brand">
         <svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         <div>
-          <div class="brand-title">TikTok Streak Manager</div>
-          <div class="brand-subtitle">Local Web Automation Dashboard</div>
+          <div class="brand-title">Công cụ tự động giữ chuỗi Tiktok</div>
+          <div class="brand-subtitle">Tác giả: Hòa Quang Thắng</div>
         </div>
       </div>
       <div class="header-actions">
@@ -545,18 +606,50 @@
       <div class="grid-2">
         <div class="form-group">
           <label class="form-label" for="cfgMessage">Nội dung tin nhắn:</label>
-          <input type="text" id="cfgMessage" class="form-input" placeholder="Nhập tin nhắn (ví dụ: Streak)">
-        </div>
-        <div class="form-row">
-          <div class="form-group" style="flex: 1;">
-            <label class="form-label" for="cfgDelay">Giãn cách an toàn (giây):</label>
-            <input type="number" id="cfgDelay" class="form-input" min="1" max="60" value="3">
+          <input type="text" id="cfgMessage" class="form-input" placeholder="Nhập tin nhắn (ví dụ: Streak {time})" oninput="updateMessagePreview()">
+          
+          <div class="template-tags-wrapper">
+            <div class="template-tags-title">
+              <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              <span>Thẻ template động (bấm để chèn nhanh vào tin nhắn):</span>
+            </div>
+            <div class="template-chips">
+              <button type="button" class="template-chip" onclick="insertTag('{time}')" title="Chèn giờ:phút:giây hiện tại">{time} <span class="chip-desc">(15:30:00)</span></button>
+              <button type="button" class="template-chip" onclick="insertTag('{date}')" title="Chèn ngày/tháng/năm hiện tại">{date} <span class="chip-desc">(30/09/2026)</span></button>
+              <button type="button" class="template-chip" onclick="insertTag('{datetime}')" title="Chèn ngày và giờ">{datetime} <span class="chip-desc">(Giờ + Ngày)</span></button>
+              <button type="button" class="template-chip" onclick="insertTag('{hour}')" title="Chèn giờ hiện tại">{hour} <span class="chip-desc">(Giờ)</span></button>
+              <button type="button" class="template-chip" onclick="insertTag('{minute}')" title="Chèn phút hiện tại">{minute} <span class="chip-desc">(Phút)</span></button>
+              <button type="button" class="template-chip" onclick="insertTag('{nickname}')" title="Chèn tên hiển thị bạn bè">{nickname} <span class="chip-desc">(Tên bạn)</span></button>
+              <button type="button" class="template-chip" onclick="insertTag('{username}')" title="Chèn TikTok handle">{username} <span class="chip-desc">(@handle)</span></button>
+            </div>
           </div>
-          <div class="form-group" style="padding-top: 22px;">
-            <label class="checkbox-label">
-              <input type="checkbox" id="cfgHeadless">
-              Chạy ẩn Chrome (Headless)
-            </label>
+
+          <div class="message-preview-box">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span>Xem trước: <strong id="messagePreviewText" class="message-preview-text">Streak</strong></span>
+          </div>
+        </div>
+
+        <div>
+          <div class="form-row" style="margin-bottom: 14px;">
+            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+              <label class="form-label" for="cfgDelay">Giãn cách an toàn (giây):</label>
+              <input type="number" id="cfgDelay" class="form-input" min="1" max="60" value="3">
+            </div>
+            <div class="form-group" style="padding-top: 22px; margin-bottom: 0;">
+              <label class="checkbox-label">
+                <input type="checkbox" id="cfgHeadless">
+                Chạy ẩn Chrome (Headless)
+              </label>
+            </div>
+          </div>
+
+          <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; font-size: 12px; color: var(--muted-foreground); line-height: 1.5;">
+            <div style="font-weight: 600; color: var(--foreground); margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+              <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              Tùy biến nội dung tin nhắn:
+            </div>
+            Bạn có thể viết câu thoại kết hợp như: <code>Streak {time}</code> hoặc <code>Chào {nickname}, duy trì streak lúc {time} ngày {date}</code>. Hệ thống sẽ tự động điền thời gian thực tế ngay khi gửi.
           </div>
         </div>
       </div>
@@ -610,7 +703,7 @@
               </th>
               <th>Tên hiển thị (Nickname)</th>
               <th>TikTok Username (@handle)</th>
-              <th style="width: 170px;">Trạng thái</th>
+              <th style="width: 230px;">Trạng thái</th>
               <th style="width: 90px;" class="cell-center">Thao tác</th>
             </tr>
           </thead>
@@ -673,6 +766,7 @@
       fetchFriends();
       fetchLogs();
       setInterval(pollUpdates, 1500);
+      setInterval(updateMessagePreview, 1000);
     });
 
     async function pollUpdates() {
@@ -722,9 +816,66 @@
         document.getElementById("cfgMessage").value = cfg.message || "Streak";
         document.getElementById("cfgDelay").value = cfg.delay_seconds || 3;
         document.getElementById("cfgHeadless").checked = cfg.headless !== false;
+        updateMessagePreview();
       } catch (e) {
         console.error("Error fetching config:", e);
       }
+    }
+
+    function insertTag(tag) {
+      const input = document.getElementById("cfgMessage");
+      const start = input.selectionStart || 0;
+      const end = input.selectionEnd || 0;
+      const val = input.value;
+      input.value = val.substring(0, start) + tag + val.substring(end);
+      const newPos = start + tag.length;
+      input.setSelectionRange(newPos, newPos);
+      input.focus();
+      updateMessagePreview();
+    }
+
+    function formatNumber2(n) {
+      return n < 10 ? '0' + n : '' + n;
+    }
+
+    function updateMessagePreview() {
+      const input = document.getElementById("cfgMessage");
+      if (!input) return;
+      const template = input.value;
+      const previewEl = document.getElementById("messagePreviewText");
+      if (!previewEl) return;
+      if (!template.trim()) {
+        previewEl.textContent = "(Tin nhắn trống)";
+        return;
+      }
+
+      const now = new Date();
+      const hh = formatNumber2(now.getHours());
+      const mm = formatNumber2(now.getMinutes());
+      const ss = formatNumber2(now.getSeconds());
+      const dd = formatNumber2(now.getDate());
+      const mon = formatNumber2(now.getMonth() + 1);
+      const yyyy = now.getFullYear();
+
+      const timeStr = `${hh}:${mm}:${ss}`;
+      const dateStr = `${dd}/${mon}/${yyyy}`;
+      const datetimeStr = `${timeStr} ${dateStr}`;
+
+      const sampleFriend = friendsData.find(f => f.enabled !== false) || friendsData[0] || { nickname: "Win", username: "gnaht34" };
+      const nick = sampleFriend.nickname || sampleFriend.username || "Win";
+      const uname = sampleFriend.username || "user_tiktok";
+
+      let rendered = template
+        .split("{time}").join(timeStr)
+        .split("{date}").join(dateStr)
+        .split("{datetime}").join(datetimeStr)
+        .split("{hour}").join(hh)
+        .split("{minute}").join(mm)
+        .split("{second}").join(ss)
+        .split("{nickname}").join(nick)
+        .split("{username}").join(uname);
+
+      previewEl.textContent = rendered;
     }
 
     async function saveConfig() {
@@ -753,6 +904,7 @@
         const res = await fetch("/api/friends");
         friendsData = await res.json();
         renderTable();
+        updateMessagePreview();
       } catch (e) {
         console.error("Error fetching friends:", e);
       }
@@ -779,6 +931,16 @@
         }
         matchedCount++;
 
+        let badgeClass = 'badge-muted';
+        let badgeIcon = '';
+        if (status.startsWith('Đã gửi')) {
+          badgeClass = 'badge-success';
+          badgeIcon = `<svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+        } else if (status.startsWith('Lỗi')) {
+          badgeClass = 'badge-error';
+          badgeIcon = `<svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+        }
+
         const tr = document.createElement("tr");
         if (!isEnabled) tr.className = "row-disabled";
 
@@ -795,8 +957,9 @@
             </a>
           </td>
           <td>
-            <span class="badge ${status.startsWith('Đã gửi') ? 'badge-success' : (status.startsWith('Lỗi') ? 'badge-error' : 'badge-muted')}">
-              ${escapeHtml(status)}
+            <span class="badge ${badgeClass}">
+              ${badgeIcon}
+              <span>${escapeHtml(status)}</span>
             </span>
           </td>
           <td class="cell-center">

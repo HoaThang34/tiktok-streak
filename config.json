@@ -1,5 +1,5 @@
 {
-    "message": "test",
-    "delay_seconds": 5,
+    "message": "Chào {nickname}, tin nhắn rep chuỗi được gửi tự động vào {time}!",
+    "delay_seconds": 10,
     "headless": true
 }
