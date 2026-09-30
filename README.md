@@ -1,29 +1,21 @@
-# TikTok Streak Manager v2.0 (Giao Diện Trực Quan & Chọn Lọc Bạn Bè)
+# TikTok Streak Manager (Giao Diện Web Local - Shadcn Light)
 
-Công cụ tự động gửi tin nhắn hàng ngày để duy trì chuỗi tương tác (**TikTok Streak**) với bạn bè đã chọn:
-* **Không gửi bừa bãi**: Chủ động chọn lọc ai được nhận tin nhắn, ai bỏ qua.
-* **Giao diện trực quan**: Quản lý danh sách bạn bè, cấu hình nội dung tin nhắn, độ trễ và theo dõi tiến trình trực tiếp.
-* **Đăng nhập bằng Cookies**: Không cần nhập mật khẩu, không dính Captcha, không sợ OTP.
-
----
-
-## 1. Cài đặt môi trường
-
-Mở Terminal và cài đặt thư viện cần thiết:
-```powershell
-pip install -r requirements.txt
-```
+Ứng dụng web cục bộ chạy trên trình duyệt (Google Chrome) để cấu hình, quản lý danh sách bạn bè và tự động gửi tin nhắn duy trì **TikTok Streak**:
+* **Giao diện Web Shadcn Light Mode**: Tinh gọn, hiện đại, nhẹ, sử dụng 100% biểu tượng SVG (không dùng emoji), không hiệu ứng nặng, phản hồi tức thì.
+* **Chạy cục bộ (Local Server)**: Chạy trên `http://localhost:5000` và tự động mở trên Google Chrome.
+* **Không gửi bừa bãi**: Chủ động chọn lọc bạn bè nào nhận tin nhắn, bạn bè nào bỏ qua.
+* **Đăng nhập Cookies**: Không cần nhập mật khẩu, không dính Captcha.
 
 ---
 
-## 2. Khởi chạy Tool Quản Lý
+## 1. Khởi chạy ứng dụng
 
-Bạn có 2 cách để mở ứng dụng:
-* **Cách 1 (Nhanh nhất trên Windows):** Click đúp vào file `run.bat`.
-* **Cách 2:** Chạy lệnh:
+* **Cách 1 (Nhanh nhất):** Nhấp đúp chuột vào file `run.bat`.
+* **Cách 2:** Chạy lệnh trong terminal:
   ```powershell
   python app.py
   ```
+Hệ thống sẽ khởi động máy chủ local và tự động mở giao diện quản lý trên Google Chrome (`http://localhost:5000`).
 
 ---
 
