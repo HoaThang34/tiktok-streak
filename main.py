@@ -1,10 +1,13 @@
-from utils import init_browser, login_tiktok, auto_send_message
+from utils import init_browser, login_with_cookies, auto_send_message
 from dotenv import load_dotenv
-import os
 
 load_dotenv()
 
 if __name__ == "__main__":
-    browser, wait = init_browser()
-    login_tiktok(browser, wait, os.getenv("TIKTOK_USERNAME"), os.getenv("TIKTOK_PASSWORD"))
-    auto_send_message(browser, wait)
+    browser, wait = init_browser(headless=True)
+    try:
+        login_with_cookies(browser, wait)
+        auto_send_message(browser, wait)
+    except Exception as e:
+        print(f"\n[LỖI]: {e}")
+        browser.quit()

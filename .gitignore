@@ -1,4 +1,5 @@
 /node_modules
 /dist
 .env
+cookies.json
 /__pycache__
