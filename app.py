@@ -124,7 +124,7 @@ def task_login_and_save_cookies():
     browser = None
     try:
         browser, wait = init_browser(headless=False)
-        browser.get("https://www.tiktok.com/login")
+        browser.get("https://www.tiktok.com/login/qrcode")
         add_log("Chrome đã mở. Hãy quét mã QR trên điện thoại hoặc đăng nhập.")
         add_log("Hệ thống sẽ tự động lưu cookies sau khi bạn đăng nhập thành công...")
 
