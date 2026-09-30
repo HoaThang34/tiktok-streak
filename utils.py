@@ -179,6 +179,55 @@ def login_with_cookies(browser, wait, cookie_file="cookies.json", log_cb=print):
     log_cb("[OK] Đăng nhập bằng cookies thành công!")
 
 
+def extract_current_chat_username(browser):
+    """
+    Trích xuất chính xác username (@handle) của người bạn trong cuộc trò chuyện đang mở trên TikTok.
+    """
+    # 1. Ưu tiên thẻ a có chứa '@' trong text (Chat header chuẩn của TikTok: "Tên\n@username")
+    try:
+        links_with_at = browser.find_elements(By.XPATH, "//a[contains(@href, '/@') and contains(., '@')]")
+        for l in links_with_at:
+            txt = l.text.strip()
+            m = re.search(r"@([a-zA-Z0-9._]+)", txt)
+            if m:
+                return m.group(1)
+    except Exception:
+        pass
+
+    # 2. Tìm trong khu vực tiêu đề chat (Chat Header)
+    try:
+        header_links = browser.find_elements(By.XPATH, "//*[contains(@class, 'ChatHeader') or contains(@class, 'chat-header') or contains(@class, 'HeaderWrapper') or contains(@class, 'ConversationHeader')]//a[contains(@href, '/@')]")
+        for l in reversed(header_links):
+            href = l.get_attribute("href") or ""
+            m = re.search(r"/@([^/?#]+)", href)
+            if m:
+                u = m.group(1)
+                if u not in ["login", "tiktokstudio"] and not href.endswith(("/video/", "/photo/")):
+                    return u
+    except Exception:
+        pass
+
+    # 3. Quét ngược danh sách link có href /@ (bỏ qua các link chung và link video)
+    try:
+        all_links = browser.find_elements(By.XPATH, "//a[contains(@href, '/@')]")
+        for l in reversed(all_links):
+            txt = l.text.strip()
+            if "@" in txt:
+                m = re.search(r"@([a-zA-Z0-9._]+)", txt)
+                if m:
+                    return m.group(1)
+            href = l.get_attribute("href") or ""
+            m = re.search(r"/@([^/?#]+)", href)
+            if m:
+                u = m.group(1)
+                if u not in ["vailuvjk", "login", "tiktokstudio"] and not href.endswith(("/video/", "/photo/")):
+                    return u
+    except Exception:
+        pass
+
+    return ""
+
+
 # ----------------------------
 # QUÉT BẠN BÈ (SCAN FRIENDS)
 # ----------------------------
@@ -227,27 +276,13 @@ def scan_friends(browser, wait, log_cb=print, should_stop=None):
         try:
             nickname = user_elem.text.strip() or f"Bạn bè {idx}"
             user_elem.click()
-            time.sleep(1.5)
+            time.sleep(1.0)
 
-            # Lấy link profile
-            link_selectors = [
-                "//a[contains(@class, 'StyledLink') and contains(@href, '/@')]",
-                "//a[contains(@href, '/@')]"
-            ]
-            username = ""
-            for l_sel in link_selectors:
-                links = browser.find_elements(By.XPATH, l_sel)
-                for l in links:
-                    href = l.get_attribute("href")
-                    if href:
-                        m = re.search(r"/@([^/?#]+)", href)
-                        if m:
-                            username = m.group(1)
-                            break
-                if username:
-                    break
+            # Lấy username chính xác của cuộc trò chuyện hiện tại
+            username = extract_current_chat_username(browser)
 
             if not username:
+                log_cb(f"[{idx}/{len(all_user)}] Không trích xuất được username của: {nickname}")
                 continue
 
             u_lower = username.lower()
@@ -325,18 +360,10 @@ def send_messages_to_selected(browser, wait, message=None, delay_sec=3, log_cb=p
 
         try:
             user_elem.click()
-            time.sleep(1.5)
+            time.sleep(1.0)
 
-            # Lấy username cuộc trò chuyện hiện tại
-            links = browser.find_elements(By.XPATH, "//a[contains(@href, '/@')]")
-            username = ""
-            for l in links:
-                href = l.get_attribute("href")
-                if href:
-                    m = re.search(r"/@([^/?#]+)", href)
-                    if m:
-                        username = m.group(1)
-                        break
+            # Lấy username chính xác cuộc trò chuyện hiện tại
+            username = extract_current_chat_username(browser)
 
             if not username:
                 continue
