@@ -126,20 +126,23 @@ def task_login_and_save_cookies():
         browser, wait = init_browser(headless=False)
         browser.get("https://www.tiktok.com/login")
         add_log("Chrome đã mở. Hãy quét mã QR trên điện thoại hoặc đăng nhập.")
-        add_log("Hệ thống sẽ tự động theo dõi và lưu cookies sau khi bạn vào trang chủ...")
+        add_log("Hệ thống sẽ tự động lưu cookies sau khi bạn đăng nhập thành công...")
 
-        # Chờ người dùng đăng nhập trong tối đa 180 giây
         logged_in = False
         start_time = time.time()
         while time.time() - start_time < 180:
             if STOP_EVENT.is_set():
                 add_log("Đã hủy quá trình đăng nhập.")
                 return
-            cookies = browser.get_cookies()
-            # Kiểm tra xem có sessionid hoặc session cookie chưa
-            has_session = any(c.get("name") in ["sessionid", "sessionid_ss", "sid_tt"] for c in cookies)
-            if has_session:
-                logged_in = True
+            try:
+                _ = browser.current_url
+                cookies = browser.get_cookies() or []
+                has_session = any(c and c.get("name") in ["sessionid", "sessionid_ss", "sid_tt"] for c in cookies)
+                if has_session:
+                    logged_in = True
+                    break
+            except Exception:
+                add_log("Cửa sổ trình duyệt đã bị đóng.")
                 break
             time.sleep(2)
 
@@ -148,10 +151,41 @@ def task_login_and_save_cookies():
             save_cookies(browser, "cookies.json")
             add_log("[Thành công] Đã lưu cookies vào file 'cookies.json'!")
         else:
-            add_log("[Hết thời gian] Không nhận diện được đăng nhập trong 3 phút.")
+            add_log("[Thông báo] Quá trình đăng nhập đã dừng hoặc chưa hoàn tất.")
+    except Exception as e:
+        add_log(f"[Lỗi]: {e}")
     finally:
         if browser:
-            browser.quit()
+            try:
+                browser.quit()
+            except Exception:
+                pass
+
+
+def reset_all_data():
+    """Xóa toàn bộ dữ liệu bạn bè, cookies, cấu hình để đưa tool về trạng thái trắng."""
+    # 1. Xóa danh sách bạn bè
+    save_friends([])
+
+    # 2. Xóa cookies
+    if os.path.exists("cookies.json"):
+        try:
+            os.remove("cookies.json")
+        except Exception:
+            with open("cookies.json", "w", encoding="utf-8") as f:
+                f.write("[]")
+
+    # 3. Đưa cấu hình về mặc định
+    default_cfg = {
+        "message": "Streak",
+        "delay_seconds": 3,
+        "headless": True
+    }
+    save_config(default_cfg)
+
+    # 4. Xóa nhật ký
+    clear_logs()
+    add_log("[Hệ thống] Đã xóa toàn bộ dữ liệu. Công cụ đã trở về trạng thái ban đầu.")
 
 
 # ----------------- HTTP REQUEST HANDLER -----------------
@@ -336,9 +370,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_json({"success": ok, "message": msg})
             return
 
-        # API: Clear Logs
-        if path == "/api/logs/clear":
-            clear_logs()
+        # API: Reset All Data
+        if path == "/api/reset-data":
+            if CURRENT_TASK["is_running"]:
+                self.send_json({"success": False, "error": "Không thể xóa dữ liệu khi đang có tác vụ chạy!"}, 400)
+                return
+            reset_all_data()
             self.send_json({"success": True})
             return
 
