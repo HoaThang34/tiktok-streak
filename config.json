@@ -1,5 +1,5 @@
 {
-    "message": "Streak",
-    "delay_seconds": 3,
+    "message": "test",
+    "delay_seconds": 5,
     "headless": true
 }
