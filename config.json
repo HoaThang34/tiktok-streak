@@ -1,5 +1,5 @@
 {
-    "message": "Rep {time}",
-    "delay_seconds": 5,
+    "message": "Chào {nickname}, đây là tin nhắn giữ chuỗi được gửi tự động vào lúc {hour}:{minute}. Nếu cậu đọc được, đừng làm mất chuỗi với tớ nhé 😇",
+    "delay_seconds": 10,
     "headless": true
 }

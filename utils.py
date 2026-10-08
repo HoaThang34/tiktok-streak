@@ -415,6 +415,30 @@ def delete_account(account_id: str):
     """Xóa tài khoản và thư mục dữ liệu của tài khoản đó."""
     accounts = load_accounts()
     accounts = [a for a in accounts if a.get("id") != account_id]
+
+    # Nếu xóa hết tất cả tài khoản, tự động tạo 1 tài khoản mới trắng tinh
+    if not accounts:
+        new_id = f"acc_{int(time.time() * 1000)}"
+        get_account_dir(new_id)
+        default_cfg = {
+            "message": "Chào {nickname}, rep chuỗi streak nè {time}!",
+            "delay_seconds": 3,
+            "headless": True
+        }
+        with open(get_account_config_path(new_id), "w", encoding="utf-8") as f:
+            json.dump(default_cfg, f, indent=4, ensure_ascii=False)
+        with open(get_account_friends_path(new_id), "w", encoding="utf-8") as f:
+            json.dump([], f, indent=4, ensure_ascii=False)
+        accounts = [{
+            "id": new_id,
+            "name": "Tài khoản 1",
+            "username": "",
+            "last_login": "Chưa đăng nhập",
+            "last_run": "Chưa chạy",
+            "status": "Chưa có cookies",
+            "enabled": True
+        }]
+
     save_accounts(accounts)
 
     target_dir = os.path.join(ACCOUNTS_DIR, account_id)

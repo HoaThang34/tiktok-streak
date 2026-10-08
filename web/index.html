@@ -542,8 +542,14 @@
       <div class="runner-bar">
         <div class="runner-info">
           <div>Quy trình: <strong>Chạy tuần tự từng tài khoản đã chọn</strong> (Mở Chrome -> Gửi tin streak -> Tắt hẳn Chrome -> Chuyển tài khoản kế tiếp)</div>
-          <div style="margin-top: 3px;">
-            Đã chọn: <strong id="selectedAccountsCount">0</strong> / <strong id="totalAccountsCount">0</strong> tài khoản
+          <div style="margin-top: 5px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+            <div>
+              Đã chọn: <strong id="selectedAccountsCount">0</strong> / <strong id="totalAccountsCount">0</strong> tài khoản
+            </div>
+            <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; color: var(--blue-fg); font-weight: 500; user-select: none;">
+              <input type="checkbox" id="chkSyncMessageOnRun" checked>
+              <span>Dùng mẫu tin nhắn hiện tại cho tất cả tài khoản khi chạy</span>
+            </label>
           </div>
         </div>
         <div class="runner-actions">
@@ -579,8 +585,14 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Mẫu tin nhắn Streak</label>
-          <input type="text" id="cfgMessage" class="form-input" placeholder="Nhập nội dung tin nhắn...">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <label class="form-label" style="margin-bottom: 0;">Mẫu tin nhắn Streak</label>
+            <span id="cfgSaveStatus" style="font-size: 11px; color: var(--muted-foreground); font-weight: 500; display: inline-flex; align-items: center; gap: 4px;">
+              <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Đã đồng bộ</span>
+            </span>
+          </div>
+          <textarea id="cfgMessage" class="form-textarea" rows="3" style="font-size: 13px; line-height: 1.5; resize: vertical;" placeholder="Nhập nội dung tin nhắn duy trì streak..." oninput="handleMessageInput()" onblur="handleMessageBlur()"></textarea>
           
           <div class="template-chips">
             <span class="template-chip" onclick="insertTag('{time}')">{time} <span class="chip-desc">Giờ</span></span>
@@ -599,25 +611,37 @@
         <div class="form-row" style="margin-bottom: 16px;">
           <div style="flex: 1;">
             <label class="form-label">Khoảng nghỉ an toàn (giây)</label>
-            <input type="number" id="cfgDelay" class="form-input" min="1" max="60" value="3">
+            <input type="number" id="cfgDelay" class="form-input" min="1" max="60" value="3" onchange="markConfigDirtyAndAutoSave()">
           </div>
           <div style="flex: 1; padding-top: 22px;">
             <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;">
-              <input type="checkbox" id="cfgHeadless" checked>
+              <input type="checkbox" id="cfgHeadless" checked onchange="markConfigDirtyAndAutoSave()">
               <span>Chạy ẩn (Headless)</span>
             </label>
           </div>
         </div>
 
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
-          <button class="btn btn-outline-danger btn-sm" onclick="confirmResetCurrentAccount()">
-            <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            Xóa trắng dữ liệu nick này
-          </button>
-          <button class="btn btn-primary" onclick="saveActiveAccountConfig()">
-            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-            Lưu cài đặt tài khoản này
-          </button>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-outline-danger btn-sm" id="btnDeleteCurrentAccount" title="Xóa tài khoản này khỏi hệ thống" onclick="deleteAccount(activeAccountId, document.getElementById('lblActiveAccountName').textContent)">
+              <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+              Xóa tài khoản này
+            </button>
+            <button class="btn btn-secondary btn-sm" title="Xóa cookies và bạn bè của tài khoản này" onclick="confirmResetCurrentAccount()">
+              <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+              Reset dữ liệu nick
+            </button>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-outline-blue btn-sm" title="Áp dụng mẫu tin nhắn và cài đặt này cho TẤT CẢ tài khoản" onclick="saveConfigToAllAccounts()">
+              <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+              Áp dụng cho TẤT CẢ tài khoản
+            </button>
+            <button class="btn btn-primary" onclick="saveActiveAccountConfig(true)">
+              <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              Lưu cho tài khoản này
+            </button>
+          </div>
         </div>
       </section>
 
@@ -904,6 +928,7 @@
         currentTaskName = data.task_name || "";
 
         // Active account tracking
+        const hadActive = activeAccountId;
         if (!activeAccountId || !accountsData.some(a => a.id === activeAccountId)) {
           activeAccountId = data.active_account_id || (accountsData[0] ? accountsData[0].id : "");
         }
@@ -912,7 +937,8 @@
         renderAccountsTable();
         renderAccountSwitcher();
 
-        if (initial || !friendsData.length) {
+        // Chỉ nạp cấu hình khi mở trang lần đầu hoặc khi chuyển sang tài khoản khác
+        if (initial || (activeAccountId && activeAccountId !== hadActive)) {
           await loadActiveAccountDetails();
         }
 
@@ -1021,10 +1047,10 @@
                 <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 ${isActive ? 'Đang xem' : 'Quản lý'}
               </button>
-              ${accountsData.length > 1 ? `
               <button class="btn btn-outline-danger btn-sm" title="Xóa tài khoản này" onclick="deleteAccount('${acc.id}', '${escapeJs(acc.name)}')" ${isTaskRunning ? "disabled" : ""}>
                 <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
-              </button>` : ''}
+                Xóa
+              </button>
             </div>
           </td>
         `;
@@ -1034,56 +1060,72 @@
 
     function renderAccountSwitcher() {
       const select = document.getElementById("selectSwitchAccount");
-      select.innerHTML = "";
-      accountsData.forEach(acc => {
-        const opt = document.createElement("option");
-        opt.value = acc.id;
-        opt.textContent = `${acc.name} ${acc.username ? '(@' + acc.username + ')' : ''}`;
-        if (acc.id === activeAccountId) opt.selected = true;
-        select.appendChild(opt);
-      });
+      if (!select) return;
+
+      const currentOpts = Array.from(select.options).map(o => o.value).join(",");
+      const newOpts = accountsData.map(a => a.id).join(",");
+
+      if (currentOpts !== newOpts) {
+        select.innerHTML = "";
+        accountsData.forEach(acc => {
+          const opt = document.createElement("option");
+          opt.value = acc.id;
+          opt.textContent = `${acc.name} ${acc.username ? '(@' + acc.username + ')' : ''}`;
+          if (acc.id === activeAccountId) opt.selected = true;
+          select.appendChild(opt);
+        });
+      } else {
+        select.value = activeAccountId;
+      }
 
       const currentAcc = accountsData.find(a => a.id === activeAccountId) || accountsData[0] || { name: "Tài khoản 1" };
       document.getElementById("lblActiveAccountName").textContent = currentAcc.name;
       document.getElementById("lblFriendsAccountName").textContent = currentAcc.name;
     }
 
-    // Switch active account to view/edit
-    async function switchActiveAccount(accId) {
-      if (activeAccountId === accId) return;
-      activeAccountId = accId;
-      try {
-        await fetch("/api/accounts/select-active", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: accId })
-        });
-      } catch (e) {}
-      renderAccountsTable();
-      renderAccountSwitcher();
-      await loadActiveAccountDetails();
+    // --- CONFIG STATE & AUTO-SAVE ---
+    let isConfigDirty = false;
+    let autoSaveTimer = null;
+
+    function updateConfigSaveStatus(text, color = "var(--muted-foreground)") {
+      const el = document.getElementById("cfgSaveStatus");
+      if (!el) return;
+      el.style.color = color;
+      el.innerHTML = `
+        <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        <span>${escapeHtml(text)}</span>
+      `;
     }
 
-    async function loadActiveAccountDetails() {
-      await fetchActiveConfig();
-      await fetchActiveFriends();
+    function handleMessageInput() {
+      isConfigDirty = true;
+      updateMessagePreview();
+      updateConfigSaveStatus("Đang nhập...", "var(--warning-fg)");
+
+      if (autoSaveTimer) clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(() => {
+        autoSaveConfig();
+      }, 700);
     }
 
-    // --- CONFIG ---
-    async function fetchActiveConfig() {
-      try {
-        const res = await fetch(`/api/config?account_id=${encodeURIComponent(activeAccountId)}`);
-        const cfg = await res.json();
-        document.getElementById("cfgMessage").value = cfg.message || "Chào {nickname}, rep chuỗi nè {time}!";
-        document.getElementById("cfgDelay").value = cfg.delay_seconds || 3;
-        document.getElementById("cfgHeadless").checked = cfg.headless !== false;
-        updateMessagePreview();
-      } catch (e) {
-        console.error("Lỗi tải config:", e);
+    function handleMessageBlur() {
+      if (isConfigDirty) {
+        if (autoSaveTimer) clearTimeout(autoSaveTimer);
+        autoSaveConfig();
       }
     }
 
-    async function saveActiveAccountConfig() {
+    function markConfigDirtyAndAutoSave() {
+      isConfigDirty = true;
+      updateConfigSaveStatus("Đang lưu...", "var(--warning-fg)");
+      if (autoSaveTimer) clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(() => {
+        autoSaveConfig();
+      }, 300);
+    }
+
+    async function autoSaveConfig() {
+      if (!activeAccountId) return;
       const msg = document.getElementById("cfgMessage").value.trim() || "Streak";
       const delay = parseInt(document.getElementById("cfgDelay").value) || 3;
       const headless = document.getElementById("cfgHeadless").checked;
@@ -1101,10 +1143,140 @@
         });
         const data = await res.json();
         if (data.success) {
-          alert("Đã lưu cài đặt cho tài khoản thành công!");
+          isConfigDirty = false;
+          updateConfigSaveStatus("✓ Đã tự động lưu", "var(--success-fg)");
         }
       } catch (e) {
-        alert("Lỗi khi lưu cấu hình: " + e);
+        console.error("Lỗi tự động lưu:", e);
+      }
+    }
+
+    // Switch active account to view/edit
+    async function switchActiveAccount(accId) {
+      if (activeAccountId === accId) return;
+
+      // Nếu đang có chỉnh sửa chưa lưu ở tài khoản cũ, tự động lưu ngay trước khi chuyển
+      if (isConfigDirty) {
+        if (autoSaveTimer) clearTimeout(autoSaveTimer);
+        await autoSaveConfig();
+      }
+
+      activeAccountId = accId;
+      try {
+        await fetch("/api/accounts/select-active", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: accId })
+        });
+      } catch (e) {}
+
+      renderAccountsTable();
+      renderAccountSwitcher();
+      await loadActiveAccountDetails();
+    }
+
+    async function loadActiveAccountDetails() {
+      await fetchActiveConfig();
+      await fetchActiveFriends();
+    }
+
+    // --- CONFIG ---
+    async function fetchActiveConfig() {
+      if (!activeAccountId) return;
+      try {
+        const res = await fetch(`/api/config?account_id=${encodeURIComponent(activeAccountId)}`);
+        const cfg = await res.json();
+        const msgEl = document.getElementById("cfgMessage");
+
+        // KHÔNG ĐÈ nếu người dùng đang gõ dở hoặc nội dung đang chỉnh sửa chưa đồng bộ
+        if (msgEl && !isConfigDirty && document.activeElement !== msgEl) {
+          msgEl.value = cfg.message !== undefined ? cfg.message : "Chào {nickname}, rep chuỗi nè {time}!";
+          updateConfigSaveStatus("Đã đồng bộ", "var(--muted-foreground)");
+        }
+
+        const delayEl = document.getElementById("cfgDelay");
+        if (delayEl && document.activeElement !== delayEl && !isConfigDirty) {
+          delayEl.value = cfg.delay_seconds !== undefined ? cfg.delay_seconds : 3;
+        }
+
+        const headlessEl = document.getElementById("cfgHeadless");
+        if (headlessEl && !isConfigDirty) {
+          headlessEl.checked = cfg.headless !== false;
+        }
+
+        updateMessagePreview();
+      } catch (e) {
+        console.error("Lỗi tải config:", e);
+      }
+    }
+
+    async function saveActiveAccountConfig(showFeedback = true) {
+      if (!activeAccountId) {
+        if (showFeedback) showToast("Chưa chọn tài khoản nào!", "error");
+        return;
+      }
+      if (autoSaveTimer) clearTimeout(autoSaveTimer);
+
+      const msg = document.getElementById("cfgMessage").value.trim() || "Streak";
+      const delay = parseInt(document.getElementById("cfgDelay").value) || 3;
+      const headless = document.getElementById("cfgHeadless").checked;
+
+      try {
+        const res = await fetch("/api/config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            account_id: activeAccountId,
+            message: msg,
+            delay_seconds: delay,
+            headless: headless
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          isConfigDirty = false;
+          updateConfigSaveStatus("✓ Đã lưu thành công", "var(--success-fg)");
+          const acc = accountsData.find(a => a.id === activeAccountId);
+          const name = acc ? acc.name : "tài khoản";
+          if (showFeedback) {
+            showToast(`Đã lưu cài đặt cho '${name}' thành công!`);
+          }
+        } else {
+          if (showFeedback) showToast("Lỗi khi lưu cài đặt: " + (data.error || "Không thể lưu"), "error");
+        }
+      } catch (e) {
+        if (showFeedback) showToast("Lỗi khi lưu cấu hình: " + e, "error");
+      }
+    }
+
+    async function saveConfigToAllAccounts() {
+      if (autoSaveTimer) clearTimeout(autoSaveTimer);
+
+      const msg = document.getElementById("cfgMessage").value.trim() || "Streak";
+      const delay = parseInt(document.getElementById("cfgDelay").value) || 3;
+      const headless = document.getElementById("cfgHeadless").checked;
+
+      try {
+        const res = await fetch("/api/config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            apply_to_all: true,
+            message: msg,
+            delay_seconds: delay,
+            headless: headless
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          isConfigDirty = false;
+          updateConfigSaveStatus("✓ Đã áp dụng toàn bộ", "var(--success-fg)");
+          showToast(`Đã áp dụng mẫu tin nhắn & cài đặt cho TẤT CẢ ${accountsData.length} tài khoản!`);
+        } else {
+          showToast("Lỗi: " + (data.error || "Không thể áp dụng"), "error");
+        }
+      } catch (e) {
+        showToast("Lỗi khi áp dụng toàn bộ: " + e, "error");
       }
     }
 
@@ -1117,7 +1289,7 @@
       const newPos = start + tag.length;
       input.setSelectionRange(newPos, newPos);
       input.focus();
-      updateMessagePreview();
+      handleMessageInput();
     }
 
     function formatNumber2(n) {
@@ -1523,7 +1695,16 @@
     }
 
     async function deleteAccount(accId, name) {
-      if (!confirm(`Bạn có chắc muốn xóa tài khoản '${name}'? Toàn bộ cookies và danh sách bạn bè của nick này sẽ bị xóa.`)) return;
+      if (isTaskRunning) {
+        alert("Không thể xóa tài khoản khi đang có tác vụ đang chạy!");
+        return;
+      }
+      const confirmMsg = accountsData.length <= 1
+        ? `Bạn có chắc muốn xóa '${name}'? Toàn bộ cookies và danh sách bạn bè của nick này sẽ bị xóa và làm mới thành tài khoản trắng.`
+        : `Bạn có chắc muốn xóa tài khoản '${name}'? Toàn bộ cookies và danh sách bạn bè của nick này sẽ bị xóa vĩnh viễn khỏi hệ thống.`;
+
+      if (!confirm(confirmMsg)) return;
+
       try {
         const res = await fetch("/api/accounts/delete", {
           method: "POST",
@@ -1532,6 +1713,7 @@
         });
         const data = await res.json();
         if (data.success) {
+          activeAccountId = "";
           await fetchStatus(true);
         } else {
           alert(data.error || "Không thể xóa tài khoản");
@@ -1648,35 +1830,47 @@
 
       const selectedAccs = accountsData.filter(a => a.enabled !== false);
       if (selectedAccs.length === 0) {
-        alert("Vui lòng tích chọn ít nhất một tài khoản trong bảng phía trên để chạy!");
+        showToast("Vui lòng tích chọn ít nhất một tài khoản trong bảng phía trên để chạy!", "error");
         return;
       }
 
       const selectedIds = selectedAccs.map(a => a.id);
-      saveActiveAccountConfig(); // tự động lưu config mới nhất
+
+      // Đảm bảo cấu hình hiện tại được lưu đồng bộ trước khi khởi chạy
+      await saveActiveAccountConfig(false);
+
+      const syncChk = document.getElementById("chkSyncMessageOnRun");
+      const currentMsg = document.getElementById("cfgMessage").value.trim() || "Streak";
+      const payload = { account_ids: selectedIds };
+      if (syncChk && syncChk.checked) {
+        payload.sync_message = currentMsg;
+      }
 
       try {
         const res = await fetch("/api/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ account_ids: selectedIds })
+          body: JSON.stringify(payload)
         });
         const data = await res.json();
         if (data.error) {
-          alert(data.error);
+          showToast(data.error, "error");
+        } else {
+          showToast(`Bắt đầu chạy tuần tự cho ${selectedIds.length} tài khoản!`);
         }
         fetchStatus(false);
       } catch (e) {
-        alert("Lỗi khởi chạy gửi: " + e);
+        showToast("Lỗi khởi chạy gửi: " + e, "error");
       }
     }
 
     async function stopCurrentTask() {
       try {
         await fetch("/api/stop", { method: "POST" });
+        showToast("Đã gửi yêu cầu dừng tác vụ...");
         fetchStatus(false);
       } catch (e) {
-        alert("Lỗi khi dừng tác vụ: " + e);
+        showToast("Lỗi khi dừng tác vụ: " + e, "error");
       }
     }
 
@@ -1715,6 +1909,35 @@
     function escapeJs(str) {
       if (!str) return "";
       return String(str).replace(/'/g, "\\'").replace(/"/g, '\\"');
+    }
+
+    function showToast(msg, type = "success") {
+      let toast = document.getElementById("appToast");
+      if (!toast) {
+        toast = document.createElement("div");
+        toast.id = "appToast";
+        toast.style.position = "fixed";
+        toast.style.bottom = "24px";
+        toast.style.right = "24px";
+        toast.style.padding = "10px 18px";
+        toast.style.borderRadius = "8px";
+        toast.style.boxShadow = "0 4px 14px rgba(0,0,0,0.18)";
+        toast.style.zIndex = "9999";
+        toast.style.fontSize = "13px";
+        toast.style.fontWeight = "500";
+        toast.style.transition = "all 0.25s ease";
+        document.body.appendChild(toast);
+      }
+      toast.style.background = type === "success" ? "#0f172a" : "#dc2626";
+      toast.style.color = "#ffffff";
+      toast.textContent = msg;
+      toast.style.opacity = "1";
+      toast.style.transform = "translateY(0)";
+      clearTimeout(toast._timer);
+      toast._timer = setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateY(10px)";
+      }, 2600);
     }
   </script>
 </body>

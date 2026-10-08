@@ -354,6 +354,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.send_response(status_code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
         self.end_headers()
         self.wfile.write(body)
 
@@ -378,6 +379,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(content)))
+                self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
                 self.end_headers()
                 self.wfile.write(content)
             else:
@@ -524,6 +526,36 @@ class DashboardHandler(BaseHTTPRequestHandler):
         # API: Save Config cho tài khoản
         if path == "/api/config":
             data = self.read_json_body()
+            apply_to_all = bool(data.get("apply_to_all", False))
+
+            if apply_to_all:
+                accounts = load_accounts()
+                for a in accounts:
+                    a_id = a.get("id")
+                    if not a_id:
+                        continue
+                    cfg = load_config(a_id)
+                    if "message" in data:
+                        cfg["message"] = data["message"]
+                    if "delay_seconds" in data:
+                        cfg["delay_seconds"] = int(data["delay_seconds"])
+                    if "headless" in data:
+                        cfg["headless"] = bool(data["headless"])
+                    save_config(cfg, a_id)
+
+                root_cfg = load_config()
+                if "message" in data:
+                    root_cfg["message"] = data["message"]
+                if "delay_seconds" in data:
+                    root_cfg["delay_seconds"] = int(data["delay_seconds"])
+                if "headless" in data:
+                    root_cfg["headless"] = bool(data["headless"])
+                save_config(root_cfg)
+
+                add_log(f"Đã cập nhật cài đặt chung cho toàn bộ {len(accounts)} tài khoản.")
+                self.send_json({"success": True, "applied_all": True})
+                return
+
             acc_id = data.get("account_id", ACTIVE_ACCOUNT_ID)
             cfg = load_config(acc_id)
             if "message" in data:
@@ -628,6 +660,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
             if not account_ids:
                 self.send_json({"success": False, "error": "Vui lòng tích chọn ít nhất 1 tài khoản để chạy!"}, 400)
                 return
+
+            # Nếu người dùng muốn đồng bộ nội dung tin nhắn hiện tại cho các tài khoản chạy
+            sync_message = data.get("sync_message")
+            if sync_message:
+                for a_id in account_ids:
+                    cfg = load_config(a_id)
+                    cfg["message"] = sync_message
+                    save_config(cfg, a_id)
+                add_log(f"Đã áp dụng mẫu tin nhắn mới cho {len(account_ids)} tài khoản trước khi gửi.")
 
             task_title = f"Chạy tuần tự {len(account_ids)} tài khoản"
             ok, msg = run_background_task(task_title, task_send_messages_sequential, account_ids)
