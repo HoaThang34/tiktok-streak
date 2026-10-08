@@ -3,45 +3,53 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Công cụ tự động giữ chuỗi Tiktok - Local Dashboard</title>
+  <title>TikTok Streak Manager - Đa Tài Khoản & Multi-Cookie</title>
   <style>
-    /* shadcn/ui Light Mode Design Tokens */
+    /* Shadcn UI Light Mode Design System */
     :root {
       --background: #f8fafc;
       --foreground: #0f172a;
       --card: #ffffff;
       --card-foreground: #0f172a;
       --primary: #0f172a;
+      --primary-hover: #1e293b;
       --primary-foreground: #f8fafc;
       --secondary: #f1f5f9;
+      --secondary-hover: #e2e8f0;
       --secondary-foreground: #0f172a;
       --muted: #f1f5f9;
       --muted-foreground: #64748b;
-      --accent: #f1f5f9;
+      --accent: #f8fafc;
       --accent-foreground: #0f172a;
       --destructive: #ef4444;
+      --destructive-hover: #dc2626;
       --destructive-foreground: #ffffff;
       --border: #e2e8f0;
       --input: #e2e8f0;
       --ring: #0f172a;
-      --radius: 6px;
+      --radius: 8px;
+
       --success-bg: #ecfdf5;
       --success-fg: #059669;
       --success-border: #a7f3d0;
+
       --warning-bg: #fffbeb;
       --warning-fg: #d97706;
       --warning-border: #fde68a;
+
       --error-bg: #fef2f2;
       --error-fg: #dc2626;
       --error-border: #fecaca;
+
+      --blue-bg: #eff6ff;
+      --blue-fg: #2563eb;
+      --blue-border: #bfdbfe;
     }
 
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
-      transition: none !important;
-      animation: none !important;
     }
 
     body {
@@ -55,11 +63,11 @@
     }
 
     .container {
-      max-width: 1180px;
+      max-width: 1200px;
       margin: 0 auto;
     }
 
-    /* SVG Icon utility */
+    /* SVG Icons */
     .icon {
       display: inline-block;
       width: 16px;
@@ -75,7 +83,7 @@
     .icon-sm { width: 14px; height: 14px; }
     .icon-lg { width: 18px; height: 18px; }
 
-    /* Header Navbar */
+    /* Header */
     .header {
       display: flex;
       justify-content: space-between;
@@ -83,146 +91,239 @@
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 16px 20px;
-      margin-bottom: 20px;
+      padding: 16px 22px;
+      margin-bottom: 22px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
     }
-
     .header-brand {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
     }
-
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      background: var(--primary);
+      color: white;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
     .brand-title {
-      font-size: 16px;
+      font-size: 17px;
       font-weight: 700;
       color: var(--foreground);
       letter-spacing: -0.01em;
     }
-
     .brand-subtitle {
       font-size: 12px;
       color: var(--muted-foreground);
     }
-
-    .header-actions {
+    .header-stats {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
+      flex-wrap: wrap;
     }
 
     /* Badges */
     .badge {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       padding: 4px 10px;
       border-radius: 9999px;
       font-size: 12px;
       font-weight: 500;
       white-space: nowrap;
     }
-    .badge-success {
-      background: var(--success-bg);
-      color: var(--success-fg);
-      border: 1px solid var(--success-border);
-    }
-    .badge-error {
-      background: var(--error-bg);
-      color: var(--error-fg);
-      border: 1px solid var(--error-border);
-    }
-    .badge-muted {
-      background: var(--muted);
-      color: var(--muted-foreground);
-      border: 1px solid var(--border);
-    }
-    .badge-warning {
-      background: var(--warning-bg);
-      color: var(--warning-fg);
-      border: 1px solid var(--warning-border);
-    }
+    .badge-success { background: var(--success-bg); color: var(--success-fg); border: 1px solid var(--success-border); }
+    .badge-error { background: var(--error-bg); color: var(--error-fg); border: 1px solid var(--error-border); }
+    .badge-warning { background: var(--warning-bg); color: var(--warning-fg); border: 1px solid var(--warning-border); }
+    .badge-blue { background: var(--blue-bg); color: var(--blue-fg); border: 1px solid var(--blue-border); }
+    .badge-muted { background: var(--muted); color: var(--muted-foreground); border: 1px solid var(--border); }
 
     /* Cards */
     .card {
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 18px 20px;
-      margin-bottom: 20px;
+      padding: 20px 22px;
+      margin-bottom: 22px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
     }
-
     .card-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 14px;
-      padding-bottom: 12px;
+      margin-bottom: 16px;
+      padding-bottom: 14px;
       border-bottom: 1px solid var(--border);
+      gap: 12px;
+      flex-wrap: wrap;
     }
-
     .card-title {
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 600;
       color: var(--foreground);
       display: flex;
       align-items: center;
       gap: 8px;
     }
+    .card-subtitle {
+      font-size: 12px;
+      color: var(--muted-foreground);
+      font-weight: normal;
+      margin-top: 2px;
+    }
 
-    /* Grid Layout */
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      height: 36px;
+      padding: 0 14px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid transparent;
+      white-space: nowrap;
+      user-select: none;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .btn-sm { height: 30px; padding: 0 10px; font-size: 12px; border-radius: 6px; }
+    .btn-lg { height: 44px; padding: 0 22px; font-size: 14px; font-weight: 600; }
+
+    .btn-primary { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
+    .btn-primary:hover { background: var(--primary-hover); }
+
+    .btn-secondary { background: var(--card); color: var(--foreground); border-color: var(--border); }
+    .btn-secondary:hover { background: var(--secondary); }
+
+    .btn-destructive { background: var(--destructive); color: var(--destructive-foreground); border-color: var(--destructive); }
+    .btn-destructive:hover { background: var(--destructive-hover); }
+
+    .btn-outline-danger { background: var(--card); color: var(--destructive); border-color: var(--border); }
+    .btn-outline-danger:hover { background: var(--error-bg); border-color: var(--error-border); }
+
+    .btn-outline-blue { background: var(--card); color: var(--blue-fg); border-color: var(--blue-border); }
+    .btn-outline-blue:hover { background: var(--blue-bg); }
+
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    /* Tables */
+    .table-container {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow-x: auto;
+      max-height: 480px;
+      overflow-y: auto;
+      background: var(--card);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+    thead {
+      position: sticky;
+      top: 0;
+      background: #f8fafc;
+      z-index: 5;
+    }
+    th {
+      padding: 10px 14px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted-foreground);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background-color: #f8fafc; }
+    tr.row-active { background-color: #f0f7ff !important; border-left: 3px solid var(--blue-fg); }
+    tr.row-disabled { opacity: 0.6; }
+
+    .cell-center { text-align: center; }
+
+    /* Account Runner Action Bar */
+    .runner-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      margin-top: 14px;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .runner-info {
+      font-size: 13px;
+      color: var(--muted-foreground);
+    }
+    .runner-info strong {
+      color: var(--foreground);
+    }
+    .runner-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Grid 2 */
     .grid-2 {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 20px;
+      gap: 22px;
     }
-    @media (max-width: 860px) {
+    @media (max-width: 900px) {
       .grid-2 { grid-template-columns: 1fr; }
     }
 
-    /* Forms & Inputs */
-    .form-group {
-      margin-bottom: 14px;
-    }
-    .form-label {
-      display: block;
-      font-size: 13px;
-      font-weight: 500;
-      margin-bottom: 6px;
-      color: var(--foreground);
-    }
-    .form-input {
+    /* Forms */
+    .form-group { margin-bottom: 14px; }
+    .form-label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: var(--foreground); }
+    .form-input, .form-textarea, .form-select {
       width: 100%;
-      height: 36px;
       border: 1px solid var(--input);
       border-radius: var(--radius);
-      padding: 0 12px;
+      padding: 8px 12px;
       font-size: 13px;
       background: var(--card);
       color: var(--foreground);
       outline: none;
+      font-family: inherit;
     }
-    .form-input:focus {
+    .form-input:focus, .form-textarea:focus, .form-select:focus {
       border-color: var(--ring);
     }
-
-    /* Template Tags & Preview */
-    .template-tags-wrapper {
-      margin-top: 8px;
-    }
-    .template-tags-title {
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--muted-foreground);
-      margin-bottom: 6px;
+    .form-row {
       display: flex;
+      gap: 12px;
       align-items: center;
-      gap: 5px;
     }
+
+    /* Template Chips & Live Preview */
     .template-chips {
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
+      margin-top: 6px;
+      margin-bottom: 10px;
     }
     .template-chip {
       display: inline-flex;
@@ -237,11 +338,9 @@
       color: var(--foreground);
       cursor: pointer;
       user-select: none;
-      transition: background 0.15s ease, border-color 0.15s ease;
     }
     .template-chip:hover {
       background: #e2e8f0;
-      border-color: #cbd5e1;
     }
     .template-chip .chip-desc {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -250,446 +349,339 @@
     }
     .message-preview-box {
       margin-top: 8px;
-      padding: 8px 12px;
+      padding: 10px 12px;
       background: #f8fafc;
       border: 1px dashed var(--border);
       border-radius: var(--radius);
       font-size: 12px;
       color: var(--muted-foreground);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      min-height: 36px;
       word-break: break-word;
     }
     .message-preview-text {
       color: var(--foreground);
       font-weight: 500;
+      margin-top: 4px;
     }
 
-    .form-row {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-    }
-
-    .checkbox-label {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      cursor: pointer;
-      user-select: none;
-    }
-    .checkbox-label input[type="checkbox"] {
-      width: 16px;
-      height: 16px;
-      accent-color: var(--primary);
-      cursor: pointer;
-    }
-
-    /* Buttons */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      height: 36px;
-      padding: 0 14px;
+    /* Logs Terminal */
+    .log-box {
+      background: #090d16;
+      border: 1px solid #1e293b;
       border-radius: var(--radius);
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      border: 1px solid transparent;
-      white-space: nowrap;
-      user-select: none;
-    }
-    .btn-sm {
-      height: 30px;
-      padding: 0 10px;
-      font-size: 12px;
-      border-radius: 4px;
-    }
-    .btn-lg {
-      height: 42px;
-      padding: 0 20px;
-      font-size: 14px;
-      font-weight: 600;
-    }
-
-    .btn-primary {
-      background: var(--primary);
-      color: var(--primary-foreground);
-      border-color: var(--primary);
-    }
-    .btn-primary:hover {
-      background: #1e293b;
-    }
-
-    .btn-secondary {
-      background: var(--card);
-      color: var(--foreground);
-      border-color: var(--border);
-    }
-    .btn-secondary:hover {
-      background: var(--secondary);
-    }
-
-    .btn-destructive {
-      background: var(--destructive);
-      color: var(--destructive-foreground);
-      border-color: var(--destructive);
-    }
-    .btn-destructive:hover {
-      background: #dc2626;
-    }
-
-    .btn-outline-danger {
-      background: var(--card);
-      color: var(--destructive);
-      border-color: var(--border);
-    }
-    .btn-outline-danger:hover {
-      background: var(--error-bg);
-      border-color: var(--error-border);
-    }
-
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    /* Action bar */
-    .action-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 20px;
-      margin-bottom: 20px;
-      gap: 16px;
-      flex-wrap: wrap;
-    }
-
-    .action-group {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .action-stats {
-      font-size: 13px;
-      color: var(--muted-foreground);
-    }
-    .action-stats strong {
-      color: var(--foreground);
-    }
-
-    /* Table Toolbar */
-    .table-toolbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 12px;
-      flex-wrap: wrap;
-    }
-
-    .search-wrapper {
-      position: relative;
-      min-width: 240px;
-    }
-    .search-icon {
-      position: absolute;
-      left: 10px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--muted-foreground);
-      pointer-events: none;
-    }
-    .search-input {
-      padding-left: 32px;
-      height: 32px;
-      font-size: 12px;
-    }
-
-    .toolbar-actions {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    /* Table */
-    .table-container {
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow-x: auto;
-      max-height: 480px;
-      overflow-y: auto;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: left;
-      font-size: 13px;
-    }
-
-    thead {
-      position: sticky;
-      top: 0;
-      background: #f8fafc;
-      z-index: 10;
-    }
-
-    th {
-      padding: 10px 14px;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--muted-foreground);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      border-bottom: 1px solid var(--border);
-      white-space: nowrap;
-    }
-
-    td {
       padding: 12px 14px;
-      border-bottom: 1px solid #f1f5f9;
-      color: var(--foreground);
-      vertical-align: middle;
-    }
-
-    tr:last-child td {
-      border-bottom: none;
-    }
-
-    tr:hover td {
-      background: #f8fafc;
-    }
-
-    tr.row-disabled td {
-      color: var(--muted-foreground);
-      background: #fafafa;
-    }
-
-    .cell-center {
-      text-align: center;
-    }
-
-    .user-handle {
+      height: 280px;
+      overflow-y: auto;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      color: var(--foreground);
-      font-weight: 600;
-      text-decoration: none;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #94a3b8;
     }
-    .user-handle:hover {
-      text-decoration: underline;
+    .log-line {
+      white-space: pre-wrap;
+      word-break: break-word;
     }
+    .log-line:hover { color: #f8fafc; }
 
-    /* Modal */
+    /* Modals */
     .modal-overlay {
       display: none;
       position: fixed;
-      inset: 0;
-      background: rgba(15, 23, 42, 0.4);
-      z-index: 50;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.45);
+      z-index: 100;
       align-items: center;
       justify-content: center;
+      padding: 20px;
     }
-    .modal-overlay.active {
-      display: flex;
-    }
+    .modal-overlay.active { display: flex; }
     .modal {
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       width: 100%;
-      max-width: 420px;
-      padding: 20px;
+      max-width: 440px;
+      padding: 22px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
     }
-    .modal-title {
-      font-size: 15px;
-      font-weight: 600;
-      margin-bottom: 14px;
-    }
-    .modal-actions {
+    .modal-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+    .modal-lg { max-width: 540px; }
+
+    /* Modal Tabs */
+    .modal-tabs {
       display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-      margin-top: 18px;
+      gap: 4px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+    .modal-tab-btn {
+      padding: 8px 12px;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted-foreground);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      user-select: none;
+    }
+    .modal-tab-btn:hover { color: var(--foreground); }
+    .modal-tab-btn.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+      font-weight: 600;
+    }
+    .modal-tab-pane { display: none; }
+    .modal-tab-pane.active { display: block; }
+
+    .file-dropzone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 18px 14px;
+      text-align: center;
+      cursor: pointer;
+      background: #f8fafc;
+      margin-top: 8px;
+    }
+    .file-dropzone:hover {
+      border-color: var(--primary);
+      background: #f1f5f9;
     }
 
-    /* Logs Console */
-    .log-box {
-      background: #f8fafc;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 12px;
-      height: 180px;
-      overflow-y: auto;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    /* Checkbox & Input tweaks */
+    input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+    .user-handle {
+      color: #2563eb;
+      text-decoration: none;
+      font-family: ui-monospace, monospace;
       font-size: 12px;
-      color: var(--foreground);
-      line-height: 1.6;
-      white-space: pre-wrap;
     }
-    .log-line {
-      margin-bottom: 2px;
-    }
-    .log-time {
-      color: var(--muted-foreground);
-    }
+    .user-handle:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
-
   <div class="container">
-
-    <!-- HEADER NAVBAR -->
+    
+    <!-- Top Header -->
     <header class="header">
       <div class="header-brand">
-        <svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <div class="brand-icon">
+          <svg class="icon icon-lg" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </div>
         <div>
-          <div class="brand-title">Công cụ tự động giữ chuỗi Tiktok</div>
-          <div class="brand-subtitle">Tác giả: Hòa Quang Thắng</div>
+          <h1 class="brand-title">TikTok Streak Manager</h1>
+          <p class="brand-subtitle">Hệ thống duy trì chuỗi Streak tự động đa tài khoản & chạy tuần tự từng cookie</p>
         </div>
       </div>
-      <div class="header-actions">
-        <span id="cookieBadge" class="badge badge-muted">
-          <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-          <span id="cookieText">Đang kiểm tra...</span>
+      <div class="header-stats">
+        <span id="badgeAccountsCount" class="badge badge-muted">
+          <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span id="txtAccountsCount">0 tài khoản</span>
         </span>
-        <button class="btn btn-secondary btn-sm" onclick="openLoginCookies()">
-          <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m21 2-2 2m-6 6 7 7v3h-3l-7-7m-2 2a5 5 0 1 1 7-7 5 5 0 0 1-7 7z"/></svg>
-          Đăng nhập / Cập nhật Cookies
-        </button>
-        <button class="btn btn-outline-danger btn-sm" onclick="confirmResetAllData()" title="Xóa toàn bộ bạn bè, cookies, cấu hình về trạng thái trắng">
-          <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-          Xóa toàn bộ dữ liệu
-        </button>
+        <span id="badgeSystemStatus" class="badge badge-success">
+          <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span id="txtSystemStatus">Hệ thống sẵn sàng</span>
+        </span>
       </div>
     </header>
 
-    <!-- ACTION CONTROL BAR -->
-    <section class="action-bar">
-      <div class="action-group">
-        <button id="btnStart" class="btn btn-primary btn-lg" onclick="startSending()">
-          <svg class="icon icon-lg" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          Bắt đầu gửi tin nhắn Streak
-        </button>
-        <button id="btnStop" class="btn btn-outline-danger btn-lg" onclick="stopTask()" disabled>
-          <svg class="icon icon-lg" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>
-          Dừng lại
-        </button>
+    <!-- SECTION 1: QUẢN LÝ DANH SÁCH TÀI KHOẢN (MULTI-ACCOUNT MANAGER) -->
+    <section class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Quản Lý Danh Sách Tài Khoản TikTok
+          </h2>
+          <p class="card-subtitle">Mỗi tài khoản lưu trữ cookies, mẫu tin nhắn streak và danh sách bạn bè riêng biệt</p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-secondary btn-sm" onclick="toggleAllAccounts(true)">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            Chọn tất cả để chạy
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="toggleAllAccounts(false)">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
+            Bỏ chọn tất cả
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="openCreateAccountModal()">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            + Thêm tài khoản mới
+          </button>
+        </div>
       </div>
-      <div class="action-stats">
-        Đang chọn: <strong id="selectedCount">0</strong> / <strong id="totalCount">0</strong> bạn bè sẽ nhận tin nhắn
+
+      <!-- Accounts Table -->
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 44px; text-align: center;">Chạy</th>
+              <th>Tài khoản & Username</th>
+              <th>Cookies</th>
+              <th>Lần cuối đăng nhập</th>
+              <th>Trạng thái / Lần cuối chạy</th>
+              <th style="text-align: center;">Thao tác nhanh</th>
+            </tr>
+          </thead>
+          <tbody id="accountsTableBody">
+            <!-- Rendered by JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Sequential Multi-Account Runner Bar -->
+      <div class="runner-bar">
+        <div class="runner-info">
+          <div>Quy trình: <strong>Chạy tuần tự từng tài khoản đã chọn</strong> (Mở Chrome -> Gửi tin streak -> Tắt hẳn Chrome -> Chuyển tài khoản kế tiếp)</div>
+          <div style="margin-top: 3px;">
+            Đã chọn: <strong id="selectedAccountsCount">0</strong> / <strong id="totalAccountsCount">0</strong> tài khoản
+          </div>
+        </div>
+        <div class="runner-actions">
+          <button id="btnStartBatch" class="btn btn-primary btn-lg" onclick="startSequentialRun()">
+            <svg class="icon icon-lg" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            <span id="txtStartBatch">Bắt đầu chạy tuần tự các tài khoản đã chọn</span>
+          </button>
+          <button id="btnStopBatch" class="btn btn-destructive btn-lg" onclick="stopCurrentTask()" disabled>
+            <svg class="icon icon-lg" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+            Dừng lại khẩn cấp
+          </button>
+        </div>
       </div>
     </section>
 
-    <!-- CONFIGURATION & SETTINGS CARD -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-          Cấu hình gửi tin nhắn
+    <!-- SECTION 2: WORKSPACE CỦA TÀI KHOẢN ĐANG CHỌN (SETTINGS & LIVE LOGS) -->
+    <div class="grid-2">
+      <!-- Cột Trái: Cấu hình riêng của tài khoản đang chọn -->
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">
+              <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              Cài Đặt Riêng: <span id="lblActiveAccountName" style="color: var(--blue-fg);">Tài khoản 1</span>
+            </h2>
+            <p class="card-subtitle">Cấu hình mẫu tin nhắn, khoảng cách và chế độ chạy riêng cho tài khoản này</p>
+          </div>
+          <div>
+            <select id="selectSwitchAccount" class="form-select" style="width: auto; padding: 4px 8px; font-size: 12px;" onchange="switchActiveAccount(this.value)">
+              <!-- Options populated by JS -->
+            </select>
+          </div>
         </div>
-        <button class="btn btn-secondary btn-sm" onclick="saveConfig()">
-          <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-          Lưu cấu hình
-        </button>
-      </div>
 
-      <div class="grid-2">
         <div class="form-group">
-          <label class="form-label" for="cfgMessage">Nội dung tin nhắn:</label>
-          <input type="text" id="cfgMessage" class="form-input" placeholder="Nhập tin nhắn (ví dụ: Streak {time})" oninput="updateMessagePreview()">
+          <label class="form-label">Mẫu tin nhắn Streak</label>
+          <input type="text" id="cfgMessage" class="form-input" placeholder="Nhập nội dung tin nhắn...">
           
-          <div class="template-tags-wrapper">
-            <div class="template-tags-title">
-              <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-              <span>Thẻ template động (bấm để chèn nhanh vào tin nhắn):</span>
-            </div>
-            <div class="template-chips">
-              <button type="button" class="template-chip" onclick="insertTag('{time}')" title="Chèn giờ:phút:giây hiện tại">{time} <span class="chip-desc">(15:30:00)</span></button>
-              <button type="button" class="template-chip" onclick="insertTag('{date}')" title="Chèn ngày/tháng/năm hiện tại">{date} <span class="chip-desc">(30/09/2026)</span></button>
-              <button type="button" class="template-chip" onclick="insertTag('{datetime}')" title="Chèn ngày và giờ">{datetime} <span class="chip-desc">(Giờ + Ngày)</span></button>
-              <button type="button" class="template-chip" onclick="insertTag('{hour}')" title="Chèn giờ hiện tại">{hour} <span class="chip-desc">(Giờ)</span></button>
-              <button type="button" class="template-chip" onclick="insertTag('{minute}')" title="Chèn phút hiện tại">{minute} <span class="chip-desc">(Phút)</span></button>
-              <button type="button" class="template-chip" onclick="insertTag('{nickname}')" title="Chèn tên hiển thị bạn bè">{nickname} <span class="chip-desc">(Tên bạn)</span></button>
-              <button type="button" class="template-chip" onclick="insertTag('{username}')" title="Chèn TikTok handle">{username} <span class="chip-desc">(@handle)</span></button>
-            </div>
+          <div class="template-chips">
+            <span class="template-chip" onclick="insertTag('{time}')">{time} <span class="chip-desc">Giờ</span></span>
+            <span class="template-chip" onclick="insertTag('{date}')">{date} <span class="chip-desc">Ngày</span></span>
+            <span class="template-chip" onclick="insertTag('{datetime}')">{datetime} <span class="chip-desc">Cả 2</span></span>
+            <span class="template-chip" onclick="insertTag('{nickname}')">{nickname} <span class="chip-desc">Tên bạn</span></span>
+            <span class="template-chip" onclick="insertTag('{username}')">{username} <span class="chip-desc">Handle</span></span>
           </div>
 
           <div class="message-preview-box">
-            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-            <span>Xem trước: <strong id="messagePreviewText" class="message-preview-text">Streak</strong></span>
+            <div>👁️ Xem trước nội dung thực tế (Live Preview):</div>
+            <div id="messagePreviewText" class="message-preview-text">Đang tải...</div>
           </div>
         </div>
 
-        <div>
-          <div class="form-row" style="margin-bottom: 14px;">
-            <div class="form-group" style="flex: 1; margin-bottom: 0;">
-              <label class="form-label" for="cfgDelay">Giãn cách an toàn (giây):</label>
-              <input type="number" id="cfgDelay" class="form-input" min="1" max="60" value="3">
-            </div>
-            <div class="form-group" style="padding-top: 22px; margin-bottom: 0;">
-              <label class="checkbox-label">
-                <input type="checkbox" id="cfgHeadless">
-                Chạy ẩn Chrome (Headless)
-              </label>
-            </div>
+        <div class="form-row" style="margin-bottom: 16px;">
+          <div style="flex: 1;">
+            <label class="form-label">Khoảng nghỉ an toàn (giây)</label>
+            <input type="number" id="cfgDelay" class="form-input" min="1" max="60" value="3">
           </div>
-
-          <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; font-size: 12px; color: var(--muted-foreground); line-height: 1.5;">
-            <div style="font-weight: 600; color: var(--foreground); margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-              <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-              Tùy biến nội dung tin nhắn:
-            </div>
-            Bạn có thể viết câu thoại kết hợp như: <code>Streak {time}</code> hoặc <code>Chào {nickname}, duy trì streak lúc {time} ngày {date}</code>. Hệ thống sẽ tự động điền thời gian thực tế ngay khi gửi.
+          <div style="flex: 1; padding-top: 22px;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;">
+              <input type="checkbox" id="cfgHeadless" checked>
+              <span>Chạy ẩn (Headless)</span>
+            </label>
           </div>
         </div>
-      </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
+          <button class="btn btn-outline-danger btn-sm" onclick="confirmResetCurrentAccount()">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Xóa trắng dữ liệu nick này
+          </button>
+          <button class="btn btn-primary" onclick="saveActiveAccountConfig()">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Lưu cài đặt tài khoản này
+          </button>
+        </div>
+      </section>
+
+      <!-- Cột Phải: Nhật ký hoạt động trực tiếp -->
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">
+              <svg class="icon" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+              Nhật Ký Hoạt Động (Live Logs)
+            </h2>
+            <p class="card-subtitle">Theo dõi chi tiết tiến trình mở trình duyệt, nạp cookies, gửi tin và tắt cửa sổ</p>
+          </div>
+          <div>
+            <button class="btn btn-secondary btn-sm" onclick="clearLogs()">
+              <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+              Xóa nhật ký
+            </button>
+          </div>
+        </div>
+
+        <div id="logBox" class="log-box">
+          <!-- Logs stream here -->
+        </div>
+      </section>
     </div>
 
-    <!-- FRIENDS LIST & MANAGEMENT -->
-    <div class="card">
+    <!-- SECTION 3: DANH SÁCH BẠN BÈ RIÊNG CỦA TÀI KHOẢN ĐANG CHỌN -->
+    <section class="card">
       <div class="card-header">
-        <div class="card-title">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          Danh sách bạn bè & Chọn lọc
+        <div>
+          <h2 class="card-title">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Danh Sách Bạn Bè Hộp Thư - <span id="lblFriendsAccountName" style="color: var(--blue-fg);">Tài khoản 1</span>
+          </h2>
+          <p class="card-subtitle">Chủ động tích chọn bạn bè nhận tin streak của tài khoản này</p>
         </div>
-        <div class="toolbar-actions">
-          <button id="btnScan" class="btn btn-secondary btn-sm" onclick="startScan()">
-            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
-            Quét bạn bè từ TikTok
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button class="btn btn-secondary btn-sm" onclick="selectAllFriends(true)">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            Chọn tất cả
           </button>
-          <button class="btn btn-secondary btn-sm" onclick="openAddModal()">
+          <button class="btn btn-secondary btn-sm" onclick="selectAllFriends(false)">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
+            Bỏ chọn tất cả
+          </button>
+          <button class="btn btn-outline-blue btn-sm" onclick="openAddFriendModal()">
             <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Thêm thủ công
           </button>
-          <button class="btn btn-secondary btn-sm" onclick="selectAll(true)">
-            <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-            Chọn tất cả
-          </button>
-          <button class="btn btn-secondary btn-sm" onclick="selectAll(false)">
-            <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            Bỏ chọn tất cả
+          <button class="btn btn-primary btn-sm" onclick="startScanCurrentAccount()">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Quét bạn bè từ TikTok
           </button>
         </div>
       </div>
 
-      <!-- Search & Filters -->
-      <div class="table-toolbar">
-        <div class="search-wrapper">
-          <svg class="icon icon-sm search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" id="searchInput" class="form-input search-input" placeholder="Tìm theo tên hoặc username..." oninput="filterTable()">
+      <!-- Friend Toolbar & Search -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 12px; flex-wrap: wrap;">
+        <div style="max-width: 320px; width: 100%;">
+          <input type="text" id="searchInput" class="form-input" style="height: 32px;" placeholder="🔍 Tìm kiếm theo tên hoặc @username..." oninput="filterFriendsTable()">
         </div>
-        <div id="tableInfo" class="action-stats">
-          Hiển thị 26 / 26 bạn bè
+        <div style="font-size: 13px; color: var(--muted-foreground);">
+          Đã chọn: <strong id="selectedFriendsCount">0</strong> / <strong id="totalFriendsCount">0</strong> bạn bè
         </div>
       </div>
 
@@ -698,127 +690,421 @@
         <table>
           <thead>
             <tr>
-              <th style="width: 48px;" class="cell-center">
-                <input type="checkbox" id="masterCheckbox" title="Chọn / Bỏ chọn tất cả" onchange="toggleMaster(this)">
-              </th>
+              <th style="width: 44px; text-align: center;">Gửi</th>
               <th>Tên hiển thị (Nickname)</th>
-              <th>TikTok Username (@handle)</th>
-              <th style="width: 230px;">Trạng thái</th>
-              <th style="width: 90px;" class="cell-center">Thao tác</th>
+              <th>TikTok Username</th>
+              <th>Trạng thái gửi lần cuối</th>
+              <th style="width: 70px; text-align: center;">Xóa</th>
             </tr>
           </thead>
           <tbody id="friendsTableBody">
-            <tr>
-              <td colspan="5" class="cell-center" style="padding: 30px; color: var(--muted-foreground);">
-                Đang nạp danh sách bạn bè...
-              </td>
-            </tr>
+            <!-- Rendered by JS -->
           </tbody>
         </table>
       </div>
-    </div>
-
-    <!-- CONSOLE LOGS CARD -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title">
-          <svg class="icon" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-          Nhật ký hoạt động (Live Logs)
-        </div>
-        <button class="btn btn-secondary btn-sm" onclick="clearLogs()">
-          <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg>
-          Xóa nhật ký
-        </button>
-      </div>
-      <div id="logBox" class="log-box"></div>
-    </div>
+    </section>
 
   </div>
 
-  <!-- MODAL: ADD FRIEND -->
-  <div id="addModal" class="modal-overlay">
-    <div class="modal">
-      <div class="modal-title">Thêm bạn bè mới</div>
+  <!-- MODAL 1: THÊM TÀI KHOẢN MỚI -->
+  <div id="modalCreateAccount" class="modal-overlay">
+    <div class="modal modal-lg">
+      <h3 class="modal-title">Thêm Tài Khoản TikTok Mới</h3>
       <div class="form-group">
-        <label class="form-label" for="addUsername">TikTok Username (@handle):</label>
-        <input type="text" id="addUsername" class="form-input" placeholder="nhap_username_khong_dau_cach">
+        <label class="form-label">Tên gợi nhớ tài khoản *</label>
+        <input type="text" id="txtNewAccountName" class="form-input" placeholder="VD: Tài khoản 2, Nick phụ, v.v.">
       </div>
+
+      <div class="form-group" style="margin-top: 14px;">
+        <label class="form-label">Phương thức nạp Cookies ban đầu (Tùy chọn):</label>
+        <div class="modal-tabs">
+          <button type="button" class="modal-tab-btn active" id="btnTabCreateEmpty" onclick="switchCreateCookieTab('empty')">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Quét QR sau
+          </button>
+          <button type="button" class="modal-tab-btn" id="btnTabCreatePaste" onclick="switchCreateCookieTab('paste')">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+            Dán Cookies
+          </button>
+          <button type="button" class="modal-tab-btn" id="btnTabCreateFile" onclick="switchCreateCookieTab('file')">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+            Tải file .json
+          </button>
+        </div>
+
+        <!-- Pane: Empty -->
+        <div id="paneCreateEmpty" class="modal-tab-pane active" style="font-size: 12px; color: var(--muted-foreground); padding: 8px 0;">
+          Tài khoản sẽ được tạo ở trạng thái sẵn sàng. Bạn có thể bấm nút "Đăng nhập / Cookie" để quét mã QR hoặc nạp cookie bất cứ lúc nào.
+        </div>
+
+        <!-- Pane: Paste -->
+        <div id="paneCreatePaste" class="modal-tab-pane">
+          <textarea id="txtCreatePasteCookies" class="form-textarea" rows="4" style="font-size: 11px; font-family: monospace;" placeholder='Dán mảng JSON cookies (từ Cookie-Editor / EditThisCookie) hoặc chuỗi Header (sessionid=...; sid_tt=...;)'></textarea>
+          <div style="font-size: 11px; color: var(--muted-foreground); margin-top: 4px;">Hỗ trợ chuẩn JSON của Cookie-Editor, EditThisCookie, hoặc chuỗi cookie header.</div>
+        </div>
+
+        <!-- Pane: File -->
+        <div id="paneCreateFile" class="modal-tab-pane">
+          <div class="file-dropzone" onclick="document.getElementById('fileCreateCookies').click()">
+            <svg class="icon icon-lg" style="margin-bottom: 6px; color: var(--muted-foreground);" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <div id="txtCreateFileName" style="font-size: 13px; font-weight: 500;">Bấm để chọn file cookies.json</div>
+            <div style="font-size: 11px; color: var(--muted-foreground); margin-top: 2px;">Chấp nhận file định dạng .json hoặc .txt</div>
+          </div>
+          <input type="file" id="fileCreateCookies" accept=".json,.txt" style="display: none;" onchange="handleCreateCookieFile(event)">
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary btn-sm" onclick="closeCreateAccountModal()">Hủy</button>
+        <button class="btn btn-primary btn-sm" onclick="submitCreateAccount()">Tạo tài khoản</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: ĐỔI TÊN TÀI KHOẢN -->
+  <div id="modalRenameAccount" class="modal-overlay">
+    <div class="modal">
+      <h3 class="modal-title">Đổi Tên Tài Khoản</h3>
+      <input type="hidden" id="txtRenameAccountId">
       <div class="form-group">
-        <label class="form-label" for="addNickname">Tên gợi nhớ (Nickname):</label>
-        <input type="text" id="addNickname" class="form-input" placeholder="Tên hiển thị">
+        <label class="form-label">Tên mới</label>
+        <input type="text" id="txtRenameAccountName" class="form-input">
       </div>
       <div class="modal-actions">
-        <button class="btn btn-secondary btn-sm" onclick="closeAddModal()">Hủy</button>
+        <button class="btn btn-secondary btn-sm" onclick="closeRenameAccountModal()">Hủy</button>
+        <button class="btn btn-primary btn-sm" onclick="submitRenameAccount()">Lưu tên mới</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: THÊM BẠN BÈ THỦ CÔNG -->
+  <div id="modalAddFriend" class="modal-overlay">
+    <div class="modal">
+      <h3 class="modal-title">Thêm Bạn Bè Thủ Công</h3>
+      <div class="form-group">
+        <label class="form-label">TikTok Username (@handle)</label>
+        <input type="text" id="txtAddFriendUsername" class="form-input" placeholder="VD: hoathang34">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nickname (Tên gợi nhớ)</label>
+        <input type="text" id="txtAddFriendNickname" class="form-input" placeholder="VD: Thắng">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary btn-sm" onclick="closeAddFriendModal()">Hủy</button>
         <button class="btn btn-primary btn-sm" onclick="submitAddFriend()">Thêm bạn bè</button>
       </div>
     </div>
   </div>
 
+  <!-- MODAL 4: CẬP NHẬT / NẠP COOKIE CHO TÀI KHOẢN -->
+  <div id="modalCookieManager" class="modal-overlay">
+    <div class="modal modal-lg">
+      <h3 class="modal-title">
+        Cập Nhật Cookie Cho: <span id="lblCookieTargetAccountName" style="color: var(--blue-fg);">Tài khoản</span>
+      </h3>
+      <input type="hidden" id="txtCookieTargetAccountId">
+
+      <div class="modal-tabs">
+        <button type="button" class="modal-tab-btn active" id="btnTabManageQr" onclick="switchManageCookieTab('qr')">
+          <svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          Quét mã QR
+        </button>
+        <button type="button" class="modal-tab-btn" id="btnTabManagePaste" onclick="switchManageCookieTab('paste')">
+          <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+          Dán Cookies
+        </button>
+        <button type="button" class="modal-tab-btn" id="btnTabManageFile" onclick="switchManageCookieTab('file')">
+          <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+          Tải file .json
+        </button>
+      </div>
+
+      <!-- Tab 1: Quét QR -->
+      <div id="paneManageQr" class="modal-tab-pane active">
+        <div style="font-size: 13px; color: var(--foreground); margin-bottom: 12px; line-height: 1.6;">
+          Mở trình duyệt Google Chrome để quét mã QR từ ứng dụng TikTok trên điện thoại. Sau khi quét xong hệ thống sẽ tự động lưu cookies và cập nhật thời gian đăng nhập.
+        </div>
+        <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
+          <button class="btn btn-primary" onclick="triggerQrLoginFromModal()">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Mở Chrome quét mã QR
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab 2: Dán Cookie -->
+      <div id="paneManagePaste" class="modal-tab-pane">
+        <div style="font-size: 12px; color: var(--muted-foreground); margin-bottom: 8px;">
+          Dán mảng JSON cookies (từ Cookie-Editor / EditThisCookie) hoặc chuỗi Header <code>sessionid=...; sid_tt=...;</code>:
+        </div>
+        <textarea id="txtManagePasteCookies" class="form-textarea" rows="5" style="font-size: 11px; font-family: monospace;" placeholder='[{"name": "sessionid", "value": "..."}] hoặc sessionid=...; sid_tt=...;'></textarea>
+        <div style="display: flex; justify-content: flex-end; margin-top: 14px;">
+          <button class="btn btn-primary" onclick="submitImportCookiePaste()">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
+            Lưu cookies đã dán
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab 3: Nạp file .json -->
+      <div id="paneManageFile" class="modal-tab-pane">
+        <div style="font-size: 12px; color: var(--muted-foreground); margin-bottom: 8px;">
+          Chọn file cookies định dạng <code>.json</code> trên máy tính:
+        </div>
+        <div class="file-dropzone" onclick="document.getElementById('fileManageCookies').click()">
+          <svg class="icon icon-lg" style="margin-bottom: 6px; color: var(--muted-foreground);" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div id="txtManageFileName" style="font-size: 13px; font-weight: 500;">Bấm để chọn file cookies.json</div>
+          <div style="font-size: 11px; color: var(--muted-foreground); margin-top: 2px;">Chấp nhận file JSON xuất từ các tiện ích mở rộng</div>
+        </div>
+        <input type="file" id="fileManageCookies" accept=".json,.txt" style="display: none;" onchange="handleManageCookieFile(event)">
+        <div style="display: flex; justify-content: flex-end; margin-top: 14px;">
+          <button id="btnSubmitManageFile" class="btn btn-primary" onclick="submitImportCookieFile()" disabled>
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Nạp cookies từ file
+          </button>
+        </div>
+      </div>
+
+      <div class="modal-actions" style="margin-top: 20px; border-top: 1px solid var(--border); padding-top: 14px;">
+        <button class="btn btn-secondary btn-sm" onclick="closeCookieModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
+
   <script>
+    // State management
+    let accountsData = [];
+    let activeAccountId = "";
     let friendsData = [];
     let lastLogIndex = 0;
     let isTaskRunning = false;
+    let currentTaskName = "";
 
-    // --- INITIALIZATION ---
+    // Initialization
     document.addEventListener("DOMContentLoaded", () => {
-      fetchStatus();
-      fetchConfig();
-      fetchFriends();
+      fetchStatus(true);
       fetchLogs();
-      setInterval(pollUpdates, 1500);
+      setInterval(pollUpdates, 1800);
       setInterval(updateMessagePreview, 1000);
     });
 
     async function pollUpdates() {
-      fetchStatus();
-      fetchLogs();
+      await fetchStatus(false);
+      await fetchLogs();
     }
 
-    // --- STATUS & COOKIES ---
-    async function fetchStatus() {
+    // --- STATUS & ACCOUNTS ---
+    async function fetchStatus(initial = false) {
       try {
         const res = await fetch("/api/status");
         const data = await res.json();
         
-        const badge = document.getElementById("cookieBadge");
-        const text = document.getElementById("cookieText");
-        if (data.has_cookies) {
-          badge.className = "badge badge-success";
-          text.textContent = `Cookies: Sẵn sàng (${data.cookies_count})`;
-        } else {
-          badge.className = "badge badge-error";
-          text.textContent = "Cookies: Chưa có";
-        }
-
+        accountsData = data.accounts || [];
         isTaskRunning = data.is_running;
-        document.getElementById("btnStart").disabled = isTaskRunning;
-        document.getElementById("btnScan").disabled = isTaskRunning;
-        document.getElementById("btnStop").disabled = !isTaskRunning;
+        currentTaskName = data.task_name || "";
 
-        if (isTaskRunning && data.task_name) {
-          document.getElementById("btnStart").textContent = `Đang chạy: ${data.task_name}...`;
-        } else {
-          document.getElementById("btnStart").innerHTML = `
-            <svg class="icon icon-lg" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            Bắt đầu gửi tin nhắn Streak
-          `;
+        // Active account tracking
+        if (!activeAccountId || !accountsData.some(a => a.id === activeAccountId)) {
+          activeAccountId = data.active_account_id || (accountsData[0] ? accountsData[0].id : "");
         }
+
+        renderHeaderStats();
+        renderAccountsTable();
+        renderAccountSwitcher();
+
+        if (initial || !friendsData.length) {
+          await loadActiveAccountDetails();
+        }
+
+        // Cập nhật trạng thái nút chạy
+        const btnStart = document.getElementById("btnStartBatch");
+        const btnStop = document.getElementById("btnStopBatch");
+        const txtStart = document.getElementById("txtStartBatch");
+
+        btnStart.disabled = isTaskRunning;
+        btnStop.disabled = !isTaskRunning;
+
+        if (isTaskRunning) {
+          txtStart.textContent = `Đang chạy: ${currentTaskName}...`;
+          document.getElementById("txtSystemStatus").textContent = `Đang thực thi (${currentTaskName})`;
+          document.getElementById("badgeSystemStatus").className = "badge badge-warning";
+        } else {
+          txtStart.textContent = "Bắt đầu chạy tuần tự các tài khoản đã chọn";
+          document.getElementById("txtSystemStatus").textContent = "Hệ thống sẵn sàng";
+          document.getElementById("badgeSystemStatus").className = "badge badge-success";
+        }
+
       } catch (e) {
-        console.error("Error fetching status:", e);
+        console.error("Lỗi khi tải trạng thái:", e);
       }
     }
 
-    // --- CONFIG ---
-    async function fetchConfig() {
+    function renderHeaderStats() {
+      const selected = accountsData.filter(a => a.enabled !== false).length;
+      document.getElementById("txtAccountsCount").textContent = `${accountsData.length} tài khoản (${selected} đã chọn)`;
+      document.getElementById("selectedAccountsCount").textContent = selected;
+      document.getElementById("totalAccountsCount").textContent = accountsData.length;
+    }
+
+    function renderAccountsTable() {
+      const tbody = document.getElementById("accountsTableBody");
+      tbody.innerHTML = "";
+
+      accountsData.forEach((acc, idx) => {
+        const isSelected = acc.enabled !== false;
+        const isActive = acc.id === activeAccountId;
+
+        const tr = document.createElement("tr");
+        if (isActive) tr.classList.add("row-active");
+        if (!isSelected) tr.classList.add("row-disabled");
+
+        // Cookies badge
+        let cookieBadge = `<span class="badge badge-error"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> Chưa có</span>`;
+        if (acc.has_cookies) {
+          cookieBadge = `<span class="badge badge-success"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Sẵn sàng (${acc.cookies_count})</span>`;
+        }
+
+        // Status badge
+        let statusBadgeClass = "badge-muted";
+        let statusIcon = "";
+        const st = acc.status || "Chưa có cookies";
+        if (st.includes("Hoàn thành") || st === "Đã có cookies" || st === "Sẵn sàng") {
+          statusBadgeClass = "badge-success";
+          statusIcon = `<svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`;
+        } else if (st.includes("Đang")) {
+          statusBadgeClass = "badge-warning";
+          statusIcon = `<svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+        } else if (st.includes("Lỗi")) {
+          statusBadgeClass = "badge-error";
+          statusIcon = `<svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+        }
+
+        const usernameText = acc.username ? `<a class="user-handle" href="https://www.tiktok.com/@${encodeURIComponent(acc.username)}" target="_blank" rel="noopener">@${escapeHtml(acc.username)}</a>` : `<span style="color: var(--muted-foreground); font-size: 12px;">(Chưa nhận diện username)</span>`;
+        const lastLoginText = acc.last_login && acc.last_login !== "Chưa đăng nhập" ? `<strong>${escapeHtml(acc.last_login)}</strong>` : `<span style="color: var(--muted-foreground);">Chưa đăng nhập</span>`;
+        const lastRunText = acc.last_run && acc.last_run !== "Chưa chạy" ? `<div style="font-size: 11px; color: var(--muted-foreground); margin-top: 3px;">Lần cuối: ${escapeHtml(acc.last_run)}</div>` : "";
+
+        tr.innerHTML = `
+          <td class="cell-center">
+            <input type="checkbox" ${isSelected ? "checked" : ""} onchange="toggleAccountRun('${acc.id}', this.checked)">
+          </td>
+          <td>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <strong style="font-size: 14px;">${escapeHtml(acc.name)}</strong>
+              ${isActive ? '<span class="badge badge-blue" style="padding: 1px 6px; font-size: 10px;">Đang chọn</span>' : ''}
+              <button class="btn btn-secondary btn-sm" style="padding: 0 4px; height: 22px;" title="Đổi tên" onclick="openRenameAccountModal('${acc.id}', '${escapeJs(acc.name)}')">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
+            </div>
+            <div style="margin-top: 2px;">${usernameText}</div>
+          </td>
+          <td>${cookieBadge}</td>
+          <td>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <svg class="icon icon-sm" style="color: var(--muted-foreground);" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span>${lastLoginText}</span>
+            </div>
+          </td>
+          <td>
+            <span class="badge ${statusBadgeClass}">
+              ${statusIcon}
+              <span>${escapeHtml(st)}</span>
+            </span>
+            ${lastRunText}
+          </td>
+          <td class="cell-center">
+            <div style="display: inline-flex; gap: 6px;">
+              <button class="btn btn-secondary btn-sm" title="Quản lý cookies (Quét QR, Dán Cookie hoặc Nạp file JSON)" onclick="openCookieModal('${acc.id}', '${escapeJs(acc.name)}')">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                Cookie / Đăng nhập
+              </button>
+              <button class="btn ${isActive ? 'btn-primary' : 'btn-outline-blue'} btn-sm" title="Chỉnh sửa cài đặt & xem danh sách bạn bè" onclick="switchActiveAccount('${acc.id}')">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                ${isActive ? 'Đang xem' : 'Quản lý'}
+              </button>
+              ${accountsData.length > 1 ? `
+              <button class="btn btn-outline-danger btn-sm" title="Xóa tài khoản này" onclick="deleteAccount('${acc.id}', '${escapeJs(acc.name)}')" ${isTaskRunning ? "disabled" : ""}>
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+              </button>` : ''}
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderAccountSwitcher() {
+      const select = document.getElementById("selectSwitchAccount");
+      select.innerHTML = "";
+      accountsData.forEach(acc => {
+        const opt = document.createElement("option");
+        opt.value = acc.id;
+        opt.textContent = `${acc.name} ${acc.username ? '(@' + acc.username + ')' : ''}`;
+        if (acc.id === activeAccountId) opt.selected = true;
+        select.appendChild(opt);
+      });
+
+      const currentAcc = accountsData.find(a => a.id === activeAccountId) || accountsData[0] || { name: "Tài khoản 1" };
+      document.getElementById("lblActiveAccountName").textContent = currentAcc.name;
+      document.getElementById("lblFriendsAccountName").textContent = currentAcc.name;
+    }
+
+    // Switch active account to view/edit
+    async function switchActiveAccount(accId) {
+      if (activeAccountId === accId) return;
+      activeAccountId = accId;
       try {
-        const res = await fetch("/api/config");
+        await fetch("/api/accounts/select-active", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: accId })
+        });
+      } catch (e) {}
+      renderAccountsTable();
+      renderAccountSwitcher();
+      await loadActiveAccountDetails();
+    }
+
+    async function loadActiveAccountDetails() {
+      await fetchActiveConfig();
+      await fetchActiveFriends();
+    }
+
+    // --- CONFIG ---
+    async function fetchActiveConfig() {
+      try {
+        const res = await fetch(`/api/config?account_id=${encodeURIComponent(activeAccountId)}`);
         const cfg = await res.json();
-        document.getElementById("cfgMessage").value = cfg.message || "Streak";
+        document.getElementById("cfgMessage").value = cfg.message || "Chào {nickname}, rep chuỗi nè {time}!";
         document.getElementById("cfgDelay").value = cfg.delay_seconds || 3;
         document.getElementById("cfgHeadless").checked = cfg.headless !== false;
         updateMessagePreview();
       } catch (e) {
-        console.error("Error fetching config:", e);
+        console.error("Lỗi tải config:", e);
+      }
+    }
+
+    async function saveActiveAccountConfig() {
+      const msg = document.getElementById("cfgMessage").value.trim() || "Streak";
+      const delay = parseInt(document.getElementById("cfgDelay").value) || 3;
+      const headless = document.getElementById("cfgHeadless").checked;
+
+      try {
+        const res = await fetch("/api/config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            account_id: activeAccountId,
+            message: msg,
+            delay_seconds: delay,
+            headless: headless
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert("Đã lưu cài đặt cho tài khoản thành công!");
+        }
+      } catch (e) {
+        alert("Lỗi khi lưu cấu hình: " + e);
       }
     }
 
@@ -861,9 +1147,9 @@
       const dateStr = `${dd}/${mon}/${yyyy}`;
       const datetimeStr = `${timeStr} ${dateStr}`;
 
-      const sampleFriend = friendsData.find(f => f.enabled !== false) || friendsData[0] || { nickname: "Win", username: "gnaht34" };
-      const nick = sampleFriend.nickname || sampleFriend.username || "Win";
-      const uname = sampleFriend.username || "user_tiktok";
+      const sampleFriend = friendsData.find(f => f.enabled !== false) || friendsData[0] || { nickname: "Bạn", username: "username_tiktok" };
+      const nick = sampleFriend.nickname || sampleFriend.username || "Bạn";
+      const uname = sampleFriend.username || "username_tiktok";
 
       let rendered = template
         .split("{time}").join(timeStr)
@@ -878,39 +1164,19 @@
       previewEl.textContent = rendered;
     }
 
-    async function saveConfig() {
-      const msg = document.getElementById("cfgMessage").value.trim() || "Streak";
-      const delay = parseInt(document.getElementById("cfgDelay").value) || 3;
-      const headless = document.getElementById("cfgHeadless").checked;
-
+    // --- FRIENDS ---
+    async function fetchActiveFriends() {
       try {
-        const res = await fetch("/api/config", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: msg, delay_seconds: delay, headless: headless })
-        });
-        const data = await res.json();
-        if (data.success) {
-          alert("Đã lưu cấu hình thành công!");
-        }
-      } catch (e) {
-        alert("Lỗi khi lưu cấu hình: " + e);
-      }
-    }
-
-    // --- FRIENDS MANAGEMENT ---
-    async function fetchFriends() {
-      try {
-        const res = await fetch("/api/friends");
+        const res = await fetch(`/api/friends?account_id=${encodeURIComponent(activeAccountId)}`);
         friendsData = await res.json();
-        renderTable();
+        renderFriendsTable();
         updateMessagePreview();
       } catch (e) {
-        console.error("Error fetching friends:", e);
+        console.error("Lỗi tải bạn bè:", e);
       }
     }
 
-    function renderTable() {
+    function renderFriendsTable() {
       const tbody = document.getElementById("friendsTableBody");
       const kw = document.getElementById("searchInput").value.toLowerCase().trim();
       tbody.innerHTML = "";
@@ -918,7 +1184,7 @@
       let selectedCount = 0;
       let matchedCount = 0;
 
-      friendsData.forEach((friend, idx) => {
+      friendsData.forEach(friend => {
         const isEnabled = friend.enabled !== false;
         if (isEnabled) selectedCount++;
 
@@ -946,11 +1212,9 @@
 
         tr.innerHTML = `
           <td class="cell-center">
-            <input type="checkbox" ${isEnabled ? "checked" : ""} onchange="toggleFriend('${u}')">
+            <input type="checkbox" ${isEnabled ? "checked" : ""} onchange="toggleFriend('${escapeJs(u)}')">
           </td>
-          <td>
-            <strong>${escapeHtml(nick)}</strong>
-          </td>
+          <td><strong>${escapeHtml(nick)}</strong></td>
           <td>
             <a class="user-handle" href="https://www.tiktok.com/@${encodeURIComponent(u)}" target="_blank" rel="noopener">
               @${escapeHtml(u)}
@@ -963,7 +1227,7 @@
             </span>
           </td>
           <td class="cell-center">
-            <button class="btn btn-outline-danger btn-sm" title="Xóa bạn này" onclick="deleteFriend('${u}')">
+            <button class="btn btn-outline-danger btn-sm" title="Xóa bạn này" onclick="deleteFriend('${escapeJs(u)}')">
               <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg>
             </button>
           </td>
@@ -971,14 +1235,12 @@
         tbody.appendChild(tr);
       });
 
-      document.getElementById("selectedCount").textContent = selectedCount;
-      document.getElementById("totalCount").textContent = friendsData.length;
-      document.getElementById("tableInfo").textContent = `Hiển thị ${matchedCount} / ${friendsData.length} bạn bè`;
-      document.getElementById("masterCheckbox").checked = (selectedCount === friendsData.length && friendsData.length > 0);
+      document.getElementById("selectedFriendsCount").textContent = selectedCount;
+      document.getElementById("totalFriendsCount").textContent = friendsData.length;
     }
 
-    function filterTable() {
-      renderTable();
+    function filterFriendsTable() {
+      renderFriendsTable();
     }
 
     async function toggleFriend(username) {
@@ -986,29 +1248,25 @@
         await fetch("/api/friends/toggle", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username: username })
+          body: JSON.stringify({ account_id: activeAccountId, username: username })
         });
-        await fetchFriends();
+        await fetchActiveFriends();
       } catch (e) {
-        console.error("Error toggling friend:", e);
+        console.error("Lỗi toggle friend:", e);
       }
     }
 
-    async function selectAll(state) {
+    async function selectAllFriends(state) {
       try {
         await fetch("/api/friends/select-all", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ state: state })
+          body: JSON.stringify({ account_id: activeAccountId, state: state })
         });
-        await fetchFriends();
+        await fetchActiveFriends();
       } catch (e) {
-        console.error("Error setting all friends:", e);
+        console.error("Lỗi chọn tất cả bạn bè:", e);
       }
-    }
-
-    function toggleMaster(checkbox) {
-      selectAll(checkbox.checked);
     }
 
     async function deleteFriend(username) {
@@ -1017,124 +1275,408 @@
         await fetch("/api/friends/delete", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username: username })
+          body: JSON.stringify({ account_id: activeAccountId, username: username })
         });
-        await fetchFriends();
+        await fetchActiveFriends();
       } catch (e) {
-        console.error("Error deleting friend:", e);
+        console.error("Lỗi xóa bạn bè:", e);
+      }
+    }
+
+    // --- ACCOUNT OPERATIONS ---
+    async function toggleAccountRun(accId, enabled) {
+      try {
+        await fetch("/api/accounts/update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: accId, enabled: enabled })
+        });
+        await fetchStatus(false);
+      } catch (e) {
+        console.error("Lỗi toggle account:", e);
+      }
+    }
+
+    async function toggleAllAccounts(state) {
+      try {
+        await fetch("/api/accounts/toggle-all", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ state: state })
+        });
+        await fetchStatus(false);
+      } catch (e) {
+        console.error("Lỗi chọn tất cả tài khoản:", e);
+      }
+    }
+
+    // --- COOKIE IMPORT & TABS LOGIC ---
+    let createCookieMode = 'empty';
+    let createUploadedCookieContent = '';
+    let manageUploadedCookieContent = '';
+
+    function switchCreateCookieTab(tab) {
+      createCookieMode = tab;
+      document.getElementById('btnTabCreateEmpty').classList.toggle('active', tab === 'empty');
+      document.getElementById('btnTabCreatePaste').classList.toggle('active', tab === 'paste');
+      document.getElementById('btnTabCreateFile').classList.toggle('active', tab === 'file');
+
+      document.getElementById('paneCreateEmpty').classList.toggle('active', tab === 'empty');
+      document.getElementById('paneCreatePaste').classList.toggle('active', tab === 'paste');
+      document.getElementById('paneCreateFile').classList.toggle('active', tab === 'file');
+    }
+
+    function handleCreateCookieFile(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      document.getElementById('txtCreateFileName').textContent = `${file.name} (${Math.round(file.size / 1024 * 10) / 10} KB)`;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        createUploadedCookieContent = evt.target.result;
+      };
+      reader.readAsText(file);
+    }
+
+    // Modal Create Account
+    function openCreateAccountModal() {
+      document.getElementById("txtNewAccountName").value = "";
+      document.getElementById("txtCreatePasteCookies").value = "";
+      document.getElementById("fileCreateCookies").value = "";
+      document.getElementById("txtCreateFileName").textContent = "Bấm để chọn file cookies.json";
+      createUploadedCookieContent = "";
+      switchCreateCookieTab("empty");
+      document.getElementById("modalCreateAccount").classList.add("active");
+    }
+    function closeCreateAccountModal() {
+      document.getElementById("modalCreateAccount").classList.remove("active");
+    }
+
+    async function submitCreateAccount() {
+      const name = document.getElementById("txtNewAccountName").value.trim();
+      if (!name) {
+        alert("Vui lòng nhập tên tài khoản!");
+        return;
+      }
+      let cookiesRaw = null;
+      if (createCookieMode === "paste") {
+        cookiesRaw = document.getElementById("txtCreatePasteCookies").value.trim();
+        if (!cookiesRaw) {
+          alert("Vui lòng dán nội dung cookie hoặc chọn 'Quét QR sau'!");
+          return;
+        }
+      } else if (createCookieMode === "file") {
+        cookiesRaw = createUploadedCookieContent;
+        if (!cookiesRaw) {
+          alert("Vui lòng chọn file cookies .json trước!");
+          return;
+        }
+      }
+
+      try {
+        const payload = { name: name };
+        if (cookiesRaw) payload.cookies_raw = cookiesRaw;
+
+        const res = await fetch("/api/accounts/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeCreateAccountModal();
+          activeAccountId = data.account.id;
+          await fetchStatus(true);
+          if (cookiesRaw) {
+            alert(`Đã tạo tài khoản '${name}' và nạp cookies thành công!`);
+          }
+        } else {
+          alert(data.error || "Không thể tạo tài khoản");
+        }
+      } catch (e) {
+        alert("Lỗi tạo tài khoản: " + e);
+      }
+    }
+
+    // Modal Cookie Manager (Quét QR, Dán Cookie, Nạp từ file)
+    function openCookieModal(accId, accName) {
+      document.getElementById('txtCookieTargetAccountId').value = accId;
+      document.getElementById('lblCookieTargetAccountName').textContent = accName;
+      document.getElementById('txtManagePasteCookies').value = '';
+      document.getElementById('fileManageCookies').value = '';
+      document.getElementById('txtManageFileName').textContent = 'Bấm để chọn file cookies.json';
+      manageUploadedCookieContent = '';
+      document.getElementById('btnSubmitManageFile').disabled = true;
+      switchManageCookieTab('qr');
+      document.getElementById('modalCookieManager').classList.add('active');
+    }
+
+    function closeCookieModal() {
+      document.getElementById('modalCookieManager').classList.remove('active');
+    }
+
+    function switchManageCookieTab(tab) {
+      document.getElementById('btnTabManageQr').classList.toggle('active', tab === 'qr');
+      document.getElementById('btnTabManagePaste').classList.toggle('active', tab === 'paste');
+      document.getElementById('btnTabManageFile').classList.toggle('active', tab === 'file');
+
+      document.getElementById('paneManageQr').classList.toggle('active', tab === 'qr');
+      document.getElementById('paneManagePaste').classList.toggle('active', tab === 'paste');
+      document.getElementById('paneManageFile').classList.toggle('active', tab === 'file');
+    }
+
+    function triggerQrLoginFromModal() {
+      const accId = document.getElementById('txtCookieTargetAccountId').value;
+      closeCookieModal();
+      loginAccountCookies(accId);
+    }
+
+    async function submitImportCookiePaste() {
+      const accId = document.getElementById('txtCookieTargetAccountId').value;
+      const raw = document.getElementById('txtManagePasteCookies').value.trim();
+      if (!raw) {
+        alert('Vui lòng dán dữ liệu cookie vào ô!');
+        return;
+      }
+      try {
+        const res = await fetch('/api/accounts/import-cookies', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ account_id: accId, cookies_raw: raw })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(`Đã nạp thành công ${data.count} cookies vào tài khoản!`);
+          closeCookieModal();
+          await fetchStatus(true);
+        } else {
+          alert('Lỗi nạp cookie: ' + (data.error || 'Dữ liệu không hợp lệ'));
+        }
+      } catch (e) {
+        alert('Lỗi kết nối: ' + e);
+      }
+    }
+
+    function handleManageCookieFile(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      document.getElementById('txtManageFileName').textContent = `${file.name} (${Math.round(file.size / 1024 * 10) / 10} KB)`;
+      document.getElementById('btnSubmitManageFile').disabled = false;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        manageUploadedCookieContent = evt.target.result;
+      };
+      reader.readAsText(file);
+    }
+
+    async function submitImportCookieFile() {
+      const accId = document.getElementById('txtCookieTargetAccountId').value;
+      if (!manageUploadedCookieContent) {
+        alert('Vui lòng chọn file .json trước!');
+        return;
+      }
+      try {
+        const res = await fetch('/api/accounts/import-cookies', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ account_id: accId, cookies_raw: manageUploadedCookieContent })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(`Đã nạp thành công ${data.count} cookies từ file!`);
+          closeCookieModal();
+          await fetchStatus(true);
+        } else {
+          alert('Lỗi nạp cookie từ file: ' + (data.error || 'Dữ liệu không hợp lệ'));
+        }
+      } catch (e) {
+        alert('Lỗi kết nối: ' + e);
+      }
+    }
+
+    // Modal Rename Account
+    function openRenameAccountModal(accId, oldName) {
+      document.getElementById("txtRenameAccountId").value = accId;
+      document.getElementById("txtRenameAccountName").value = oldName;
+      document.getElementById("modalRenameAccount").classList.add("active");
+    }
+    function closeRenameAccountModal() {
+      document.getElementById("modalRenameAccount").classList.remove("active");
+    }
+    async function submitRenameAccount() {
+      const accId = document.getElementById("txtRenameAccountId").value;
+      const newName = document.getElementById("txtRenameAccountName").value.trim();
+      if (!newName) {
+        alert("Tên không được để trống!");
+        return;
+      }
+      try {
+        await fetch("/api/accounts/update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: accId, name: newName })
+        });
+        closeRenameAccountModal();
+        await fetchStatus(false);
+      } catch (e) {
+        alert("Lỗi đổi tên: " + e);
+      }
+    }
+
+    async function deleteAccount(accId, name) {
+      if (!confirm(`Bạn có chắc muốn xóa tài khoản '${name}'? Toàn bộ cookies và danh sách bạn bè của nick này sẽ bị xóa.`)) return;
+      try {
+        const res = await fetch("/api/accounts/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: accId })
+        });
+        const data = await res.json();
+        if (data.success) {
+          await fetchStatus(true);
+        } else {
+          alert(data.error || "Không thể xóa tài khoản");
+        }
+      } catch (e) {
+        alert("Lỗi xóa tài khoản: " + e);
+      }
+    }
+
+    // Login QR Code
+    async function loginAccountCookies(accId) {
+      if (isTaskRunning) {
+        alert("Đang có tác vụ khác đang chạy!");
+        return;
+      }
+      const acc = accountsData.find(a => a.id === accId);
+      const name = acc ? acc.name : "Tài khoản";
+      if (!confirm(`Trình duyệt Chrome sẽ mở ra trang QR Code để bạn đăng nhập cho '${name}'. Bạn có muốn tiếp tục?`)) return;
+
+      try {
+        const res = await fetch("/api/login-cookies", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ account_id: accId })
+        });
+        const data = await res.json();
+        if (data.error) alert(data.error);
+        fetchStatus(false);
+      } catch (e) {
+        alert("Lỗi khởi chạy đăng nhập: " + e);
+      }
+    }
+
+    // Scan Friends
+    async function startScanCurrentAccount() {
+      if (isTaskRunning) {
+        alert("Đang có tác vụ khác đang chạy!");
+        return;
+      }
+      try {
+        const res = await fetch("/api/scan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ account_id: activeAccountId })
+        });
+        const data = await res.json();
+        if (data.error) alert(data.error);
+        fetchStatus(false);
+      } catch (e) {
+        alert("Lỗi quét bạn bè: " + e);
       }
     }
 
     // Modal Add Friend
-    function openAddModal() {
-      document.getElementById("addUsername").value = "";
-      document.getElementById("addNickname").value = "";
-      document.getElementById("addModal").classList.add("active");
+    function openAddFriendModal() {
+      document.getElementById("txtAddFriendUsername").value = "";
+      document.getElementById("txtAddFriendNickname").value = "";
+      document.getElementById("modalAddFriend").classList.add("active");
     }
-    function closeAddModal() {
-      document.getElementById("addModal").classList.remove("active");
+    function closeAddFriendModal() {
+      document.getElementById("modalAddFriend").classList.remove("active");
     }
     async function submitAddFriend() {
-      const u = document.getElementById("addUsername").value.trim().replace("@", "");
-      const nick = document.getElementById("addNickname").value.trim() || u;
+      const u = document.getElementById("txtAddFriendUsername").value.trim().replace("@", "");
+      const nick = document.getElementById("txtAddFriendNickname").value.trim() || u;
       if (!u) {
         alert("Vui lòng nhập Username!");
         return;
       }
       try {
-        await fetch("/api/friends/add", {
+        const res = await fetch("/api/friends/add", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username: u, nickname: nick })
+          body: JSON.stringify({ account_id: activeAccountId, username: u, nickname: nick })
         });
-        closeAddModal();
-        await fetchFriends();
+        const data = await res.json();
+        if (data.success) {
+          closeAddFriendModal();
+          await fetchActiveFriends();
+        } else {
+          alert(data.error || "Không thể thêm bạn bè");
+        }
       } catch (e) {
-        alert("Lỗi khi thêm bạn bè: " + e);
+        alert("Lỗi thêm bạn bè: " + e);
       }
     }
 
-    // --- EXECUTION ACTIONS ---
-    async function startScan() {
-      if (isTaskRunning) return;
+    // Reset current account
+    async function confirmResetCurrentAccount() {
+      if (isTaskRunning) {
+        alert("Vui lòng đợi tác vụ đang chạy kết thúc trước!");
+        return;
+      }
+      const acc = accountsData.find(a => a.id === activeAccountId);
+      const name = acc ? acc.name : "tài khoản này";
+      if (!confirm(`Bạn có chắc muốn xóa trắng cookies, bạn bè và cài đặt của '${name}'?`)) return;
+
       try {
-        const res = await fetch("/api/scan", { method: "POST" });
-        const data = await res.json();
-        if (data.error) alert(data.error);
-        fetchStatus();
+        await fetch("/api/reset-data", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ account_id: activeAccountId })
+        });
+        await fetchStatus(true);
+        alert(`Đã xóa trắng dữ liệu của '${name}'!`);
       } catch (e) {
-        alert("Lỗi khởi chạy quét: " + e);
+        alert("Lỗi reset dữ liệu: " + e);
       }
     }
 
-    async function startSending() {
+    // --- SEQUENTIAL RUNNER (CHẠY TUẦN TỰ NHIỀU TÀI KHOẢN) ---
+    async function startSequentialRun() {
       if (isTaskRunning) return;
-      saveConfig(); // auto save latest config
+
+      const selectedAccs = accountsData.filter(a => a.enabled !== false);
+      if (selectedAccs.length === 0) {
+        alert("Vui lòng tích chọn ít nhất một tài khoản trong bảng phía trên để chạy!");
+        return;
+      }
+
+      const selectedIds = selectedAccs.map(a => a.id);
+      saveActiveAccountConfig(); // tự động lưu config mới nhất
+
       try {
-        const res = await fetch("/api/send", { method: "POST" });
+        const res = await fetch("/api/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ account_ids: selectedIds })
+        });
         const data = await res.json();
-        if (data.error) alert(data.error);
-        fetchStatus();
+        if (data.error) {
+          alert(data.error);
+        }
+        fetchStatus(false);
       } catch (e) {
         alert("Lỗi khởi chạy gửi: " + e);
       }
     }
 
-    async function stopTask() {
+    async function stopCurrentTask() {
       try {
         await fetch("/api/stop", { method: "POST" });
-        fetchStatus();
+        fetchStatus(false);
       } catch (e) {
         alert("Lỗi khi dừng tác vụ: " + e);
-      }
-    }
-
-    async function openLoginCookies() {
-      if (isTaskRunning) {
-        alert("Đang có tác vụ khác đang chạy!");
-        return;
-      }
-      if (!confirm("Trình duyệt Chrome sẽ mở ra trang TikTok để bạn đăng nhập. Bạn có muốn tiếp tục?")) return;
-      try {
-        const res = await fetch("/api/login-cookies", { method: "POST" });
-        const data = await res.json();
-        if (data.error) alert(data.error);
-      } catch (e) {
-        alert("Lỗi mở đăng nhập: " + e);
-      }
-    }
-
-    async function confirmResetAllData() {
-      if (isTaskRunning) {
-        alert("Vui lòng đợi hoặc bấm 'Dừng lại' tác vụ đang chạy trước khi xóa dữ liệu!");
-        return;
-      }
-      const confirmed = confirm(
-        "CẢNH BÁO: Bạn có chắc chắn muốn xóa toàn bộ dữ liệu?\n\n" +
-        "• Danh sách bạn bè sẽ bị xóa trắng hoàn toàn.\n" +
-        "• Cookies đăng nhập sẽ bị xóa.\n" +
-        "• Cấu hình tin nhắn sẽ đưa về mặc định ban đầu.\n" +
-        "• Toàn bộ nhật ký hoạt động sẽ được làm mới.\n\n" +
-        "Hành động này sẽ đưa công cụ về trạng thái một tool trắng tinh!"
-      );
-      if (!confirmed) return;
-
-      try {
-        const res = await fetch("/api/reset-data", { method: "POST" });
-        const data = await res.json();
-        if (data.success) {
-          alert("Đã xóa toàn bộ dữ liệu thành công! Tool đã trở về trạng thái trắng.");
-          lastLogIndex = 0;
-          document.getElementById("logBox").innerHTML = "";
-          fetchStatus();
-          fetchConfig();
-          fetchFriends();
-          fetchLogs();
-        } else {
-          alert("Lỗi: " + (data.error || "Không thể xóa dữ liệu"));
-        }
-      } catch (e) {
-        alert("Lỗi kết nối khi xóa dữ liệu: " + e);
       }
     }
 
@@ -1165,9 +1707,14 @@
       } catch (e) {}
     }
 
+    // Utilities
     function escapeHtml(str) {
       if (!str) return "";
-      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+      return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+    function escapeJs(str) {
+      if (!str) return "";
+      return String(str).replace(/'/g, "\\'").replace(/"/g, '\\"');
     }
   </script>
 </body>

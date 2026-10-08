@@ -1,6 +1,6 @@
-# TikTok Streak Manager (Local Web Automation Dashboard)
+# TikTok Streak Manager (Multi-Account Web Automation Dashboard)
 
-Ứng dụng web cục bộ chạy trên máy tính cá nhân giúp tự động hóa quá trình gửi tin nhắn duy trì chuỗi **Streak** trên TikTok an toàn, tiện lợi và không bị gửi bừa bãi.
+Ứng dụng web cục bộ chạy trên máy tính cá nhân giúp tự động hóa quá trình gửi tin nhắn duy trì chuỗi **Streak** trên TikTok an toàn, tiện lợi, hỗ trợ **quản lý và chạy nhiều tài khoản (nhiều cookies)**.
 
 Giao diện được thiết kế theo phong cách **Shadcn UI Light Mode**: tối giản, thanh lịch, sử dụng 100% biểu tượng SVG, phản hồi tức thì và không có chuyển động rườm rà.
 
@@ -8,19 +8,26 @@ Giao diện được thiết kế theo phong cách **Shadcn UI Light Mode**: t�
 
 ## Điểm Nổi Bật
 
-* **Chạy cục bộ 100% (Local Server)**: Hoạt động trực tiếp trên máy của bạn (`http://localhost:5000`), không phụ thuộc server trung gian, đảm bảo an toàn tuyệt đối cho tài khoản và dữ liệu cá nhân.
-* **Đăng nhập linh hoạt qua Cookies / QR Code**: Đăng nhập quét mã QR trực tiếp từ ứng dụng TikTok điện thoại hoặc lưu session cookies một lần duy nhất. Không cần nhập mật khẩu, không lo bị chặn hay gặp captcha.
-* **Chọn lọc người nhận thông minh (Không gửi bừa bãi)**: Tự động quét danh sách hộp thư, trích xuất chính xác Nickname và TikTok Handle (`@username`). Bạn chủ động tích chọn từng người nhận hoặc bỏ qua.
-* **Template tin nhắn thời gian động**:
+* **Hỗ trợ đa tài khoản (Multi-Account & Multi-Cookie)**:
+  * Thêm, đổi tên, xóa và quản lý nhiều tài khoản TikTok không giới hạn.
+  * Mỗi tài khoản có phiên làm việc (cookies), cấu hình tin nhắn, thời gian giãn cách và danh sách bạn bè riêng biệt.
+* **Chạy tuần tự từng tài khoản an toàn tuyệt đối**:
+  * Cho phép người dùng tùy ý tích chọn các tài khoản muốn chạy trong mỗi đợt.
+  * Cơ chế thực thi tuần tự: **Khởi chạy tài khoản -> nạp cookies -> gửi tin nhắn streak -> tắt hoàn toàn cửa sổ Chrome -> nghỉ ngắn -> chuyển sang tài khoản tiếp theo**.
+  * Giải phóng bộ nhớ và tránh triệt để xung đột phiên đăng nhập giữa các tài khoản.
+* **Bổ sung trạng thái chi tiết theo từng tài khoản**:
+  * Ghi nhận và hiển thị rõ ràng **thời gian lần cuối đăng nhập** (`last_login`).
+  * Trạng thái phiên làm việc (`Sẵn sàng (N cookies)` / `Chưa có cookies`).
+  * Trạng thái và thời gian lần cuối chạy (`Hoàn thành (X/Y bạn)`, `Đang chạy...`, `Lỗi...`).
+* **Đăng nhập linh hoạt qua Cookies / QR Code**:
+  * Đăng nhập quét mã QR trực tiếp từ ứng dụng TikTok điện thoại cho từng tài khoản riêng biệt. Không cần nhập mật khẩu, không lo bị chặn hay gặp captcha.
+* **Template tin nhắn thời gian động riêng theo tài khoản**:
   * Hỗ trợ các biến: `{time}`, `{date}`, `{datetime}`, `{hour}`, `{minute}`, `{second}`, `{nickname}`, `{username}`.
-  * Tích hợp các nút bấm chèn nhanh một chạm (Click-to-insert).
   * Khung xem trước trực tiếp (Live Preview) với đồng hồ thời gian thực.
-* **Lưu vết trạng thái chi tiết**: Cột trạng thái ghi nhận rõ ràng cả thời gian và ngày gửi lần cuối dạng `Đã gửi (HH:MM:SS DD/MM/YYYY)`.
 * **Cơ chế an toàn cao**:
   * Tùy chỉnh khoảng nghỉ (giây) giữa các lượt gửi để tránh spam.
-  * Hỗ trợ chế độ chạy ẩn (Headless) để không chiếm màn hình.
-  * Nút dừng khẩn cấp bất cứ lúc nào.
-* **Xóa dữ liệu trắng một click**: Nút "Xóa toàn bộ dữ liệu" giúp đưa công cụ về trạng thái ban đầu khi cần thiết lập lại.
+  * Hỗ trợ chế độ chạy ẩn (Headless) hoặc hiển thị trình duyệt theo từng tài khoản.
+  * Nút dừng khẩn cấp bất cứ lúc nào (tự động đóng trình duyệt ngay lập tức).
 
 ---
 
@@ -28,14 +35,18 @@ Giao diện được thiết kế theo phong cách **Shadcn UI Light Mode**: t�
 
 ```text
 tiktok-streak/
-├── app.py             # Máy chủ HTTP cục bộ phục vụ Web Dashboard & API
-├── utils.py           # Module Selenium lõi xử lý quét bạn bè, template và gửi tin
+├── app.py             # Máy chủ HTTP cục bộ phục vụ Web Dashboard & API đa tài khoản
+├── utils.py           # Module Selenium lõi & trình quản lý đa tài khoản, cookies, bạn bè
 ├── web/
 │   └── index.html     # Giao diện Web Dashboard (Shadcn Light Mode, SVG icons)
-├── config.json        # Cấu hình tin nhắn, thời gian giãn cách, chế độ chạy ẩn
-├── friends.json       # Danh sách bạn bè và trạng thái chọn lọc (JSON)
-├── friends.csv        # Danh sách bạn bè định dạng bảng tính (CSV)
-├── cookies.json       # Phiên làm việc TikTok (được bảo mật trong .gitignore)
+├── accounts.json      # Danh sách tài khoản, thời gian lần cuối đăng nhập, trạng thái
+├── accounts/          # Thư mục lưu dữ liệu độc lập của từng tài khoản (được bảo mật trong .gitignore)
+│   ├── acc_1/
+│   │   ├── cookies.json       # Phiên đăng nhập riêng của tài khoản 1
+│   │   ├── config.json        # Cấu hình tin nhắn riêng của tài khoản 1
+│   │   ├── friends.json       # Danh sách bạn bè riêng của tài khoản 1
+│   │   └── friends.csv        # Danh sách bạn bè dạng bảng tính CSV
+│   └── acc_2/...
 ├── requirements.txt   # Danh sách thư viện Python cần thiết
 ├── run.bat            # Phím tắt khởi chạy nhanh trên Windows
 ├── .env               # Biến môi trường
@@ -75,44 +86,40 @@ http://localhost:5000
 
 ---
 
-## Hướng Dẫn Sử Dụng
+## Hướng Dẫn Sử Dụng Đa Tài Khoản
 
-### Bước 1: Đăng nhập & Lưu Cookies
-* Nếu thanh trạng thái góc phải hiển thị `Cookies: Chưa có`, nhấn vào nút **"Đăng nhập / Cập nhật Cookies"**.
-* Cửa sổ trình duyệt Chrome sẽ mở ra trang đăng nhập TikTok. Bạn chỉ cần dùng ứng dụng TikTok trên điện thoại quét mã QR để đăng nhập.
-* Sau khi đăng nhập thành công, hệ thống tự động lưu cookies vào máy và sẵn sàng hoạt động.
+### Bước 1: Quản lý & Đăng nhập / Nạp Cookies tài khoản
+1. Tại mục **"Quản Lý Danh Sách Tài Khoản TikTok"**:
+   * Nhấn nút **"+ Thêm tài khoản mới"**:
+     * Bạn có thể tạo tài khoản trống (đăng nhập sau), HOẶC dán cookies ngay, HOẶC chọn file `.json` cookies có sẵn trên máy.
+   * Để nạp/cập nhật cookie cho tài khoản bất kỳ, nhấn nút **"Cookie / Đăng nhập"** trên dòng tài khoản đó. Có 3 lựa chọn linh hoạt:
+     * **Cách 1 - Quét mã QR**: Mở Chrome quét mã QR từ app TikTok điện thoại, tự động lưu cookies sau khi quét xong.
+     * **Cách 2 - Dán Cookies**: Dán mảng JSON cookies (xuất từ Cookie-Editor / EditThisCookie) hoặc chuỗi Header `sessionid=...; sid_tt=...;` và nhấn Lưu.
+     * **Cách 3 - Tải file .json**: Bấm chọn file `cookies.json` trên máy tính để nạp vào tài khoản ngay lập tức.
+   * Sau khi nạp cookie thành công, tài khoản sẽ chuyển sang trạng thái **"Sẵn sàng"** và ghi nhận **thời gian lần cuối đăng nhập**.
 
-### Bước 2: Quét & Lọc danh sách bạn bè
-* Nhấn nút **"Quét bạn bè từ TikTok"** để tool tự động mở hộp thư và nạp danh sách các bạn bè gần đây.
-* Tại bảng danh sách bạn bè:
-  * Tích chọn ô vuông phía trước những bạn bè muốn gửi tin nhắn duy trì Streak.
-  * Bỏ tích những bạn bè không muốn gửi.
-  * Có thể sử dụng các nút **"Chọn tất cả"**, **"Bỏ chọn tất cả"** hoặc ô **"Tìm kiếm"** theo tên / username.
-  * Bổ sung người nhận mới qua nút **"Thêm thủ công"**.
+### Bước 2: Thiết lập mẫu tin nhắn & danh sách bạn bè riêng
+1. Nhấn nút **"Quản lý"** trên tài khoản bạn muốn thiết lập.
+2. Tại khu vực **"Cài Đặt Riêng"**:
+   * Tùy chỉnh mẫu tin nhắn streak (sử dụng các tag `{time}`, `{nickname}`, v.v.).
+   * Cài đặt khoảng nghỉ an toàn và chế độ chạy ẩn (Headless).
+   * Nhấn **"Lưu cài đặt tài khoản này"**.
+3. Tại khu vực **"Danh Sách Bạn Bè Hộp Thư"**:
+   * Nhấn **"Quét bạn bè từ TikTok"** để tool nạp danh bạ hộp thư của tài khoản này.
+   * Tích chọn những bạn bè muốn gửi streak, bỏ tích những bạn bè không muốn gửi.
 
-### Bước 3: Soạn nội dung tin nhắn với Template
-* Nhập mẫu tin nhắn vào ô **"Nội dung tin nhắn"**.
-* Bạn có thể bấm vào các thẻ template bên dưới để chèn nhanh:
-  * `{time}`: Thời gian hiện tại (`15:30:45`)
-  * `{date}`: Ngày hiện tại (`30/09/2026`)
-  * `{datetime}`: Cả ngày và giờ (`15:30:45 30/09/2026`)
-  * `{hour}`: Giờ hiện tại (`15`)
-  * `{minute}`: Phút hiện tại (`30`)
-  * `{nickname}`: Tên hiển thị của bạn bè
-  * `{username}`: TikTok Handle của bạn bè (`@handle`)
-* Khung **Xem trước (Live Preview)** sẽ hiển thị ngay tức thì câu tin nhắn mẫu theo thời gian thực.
-* Nhấn **"Lưu cấu hình"**.
-
-### Bước 4: Khởi chạy gửi tin nhắn
-* Nhấn nút **"Bắt đầu gửi tin nhắn Streak"**.
-* Hệ thống sẽ tự động duyệt qua các bạn bè được chọn, soạn tin nhắn theo đúng template thời gian và gửi đi.
-* Cột **Trạng thái** sẽ được cập nhật ngày giờ gửi lần cuối (ví dụ: `Đã gửi (15:22:58 30/09/2026)`).
-* Theo dõi chi tiết từng thao tác tại khung **Nhật ký hoạt động (Live Logs)**.
-* Có thể nhấn nút **"Dừng lại"** bất cứ lúc nào để ngắt tiến trình an toàn.
+### Bước 3: Khởi chạy tuần tự nhiều tài khoản
+1. Tại bảng danh sách tài khoản, tích chọn vào ô vuông **"Chạy"** của những tài khoản bạn muốn chạy đợt này (hoặc bấm **"Chọn tất cả để chạy"**).
+2. Nhấn nút lớn: **"▶ Bắt đầu chạy tuần tự các tài khoản đã chọn"**.
+3. Quy trình tự động diễn ra:
+   * **Tài khoản 1**: Mở Chrome -> Nạp cookies -> Gửi tin nhắn streak cho bạn bè được chọn -> Cập nhật trạng thái & thời gian gửi -> **Tắt hoàn toàn cửa sổ Chrome**.
+   * Nghỉ ngắn 3 giây.
+   * **Tài khoản 2**: Mở Chrome -> Nạp cookies -> Gửi tin nhắn streak -> **Tắt hoàn toàn cửa sổ Chrome** -> ...
+4. Theo dõi chi tiết mọi diễn biến tại khung **Nhật ký hoạt động (Live Logs)**.
+5. Bạn có thể nhấn **"Dừng lại khẩn cấp"** bất cứ lúc nào để lập tức ngắt tiến trình và đóng trình duyệt.
 
 ---
 
-## Lưu Ý Về An Toàn & Bảo Mật
-
-* **Không chia sẻ file `cookies.json`**: File này chứa phiên đăng nhập tài khoản TikTok của bạn và đã được cấu hình tự động loại trừ trong `.gitignore`.
-* **Giãn cách an toàn**: Nên duy trì khoảng cách từ `3 - 5 giây` trở lên giữa mỗi lượt gửi tin nhắn để tránh bị TikTok cảnh báo tần suất gửi.
+## Bảo Mật Thông Tin
+* Toàn bộ dữ liệu cookie của mọi tài khoản được lưu trữ an toàn trong thư mục `accounts/` và file `cookies.json`.
+* Thư mục này đã được tự động loại trừ trong file `.gitignore` để tránh rủi ro rò rỉ dữ liệu khi đẩy lên Git.

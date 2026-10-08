@@ -23,6 +23,8 @@ __pycache__/
 .env.local
 .env.*.local
 cookies.json
+accounts/
+accounts.json
 
 # --- Trình biên dịch & Web runtime (nếu có) ---
 node_modules/
