@@ -1,5 +1,5 @@
 {
-    "message": "Chào {nickname}, đây là tin nhắn giữ chuỗi được gửi tự động vào lúc {hour}:{minute}. Nếu cậu đọc được, đừng làm mất chuỗi với tớ nhé 😇",
+    "message": "Đây là tin nhắn tự động được gửi vào {time}, chúc bạn {nickname} 1 ngày tốt lành!",
     "delay_seconds": 10,
     "headless": true
 }

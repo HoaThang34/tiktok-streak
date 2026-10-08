@@ -547,7 +547,7 @@
               Đã chọn: <strong id="selectedAccountsCount">0</strong> / <strong id="totalAccountsCount">0</strong> tài khoản
             </div>
             <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; color: var(--blue-fg); font-weight: 500; user-select: none;">
-              <input type="checkbox" id="chkSyncMessageOnRun" checked>
+              <input type="checkbox" id="chkSyncMessageOnRun">
               <span>Dùng mẫu tin nhắn hiện tại cho tất cả tài khoản khi chạy</span>
             </label>
           </div>
@@ -906,6 +906,15 @@
 
     // Initialization
     document.addEventListener("DOMContentLoaded", () => {
+      const syncChk = document.getElementById("chkSyncMessageOnRun");
+      if (syncChk) {
+        // Mặc định luôn là OFF trừ khi người dùng đã chủ động bật trước đó
+        syncChk.checked = localStorage.getItem("syncMessageOnRun") === "true";
+        syncChk.addEventListener("change", () => {
+          localStorage.setItem("syncMessageOnRun", syncChk.checked ? "true" : "false");
+        });
+      }
+
       fetchStatus(true);
       fetchLogs();
       setInterval(pollUpdates, 1800);
