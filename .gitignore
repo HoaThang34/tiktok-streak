@@ -23,6 +23,7 @@ __pycache__/
 .env.local
 .env.*.local
 cookies.json
+config.json
 accounts/
 accounts.json
 friends.json

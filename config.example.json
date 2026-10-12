@@ -1,0 +1,5 @@
+{
+    "message": "Chào {nickname}, rep chuỗi streak nè {time}!",
+    "delay_seconds": 10,
+    "headless": true
+}

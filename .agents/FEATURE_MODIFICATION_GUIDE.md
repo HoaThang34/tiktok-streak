@@ -156,10 +156,12 @@
    * **Chat 1-1:** Trích xuất `@username` cá nhân từ thẻ `<a>` hoặc text trong Chat Header.
    * **Nhóm chat (Group Chat):** Nhóm không có `@handle` cá nhân mà có tiêu đề nhóm và số lượng thành viên (`thành viên`, `members`,...). Được định danh là `[Nhóm] <Tên nhóm>`, cờ `is_group=True`.
    * **Đối chiếu thông minh (`find_matching_target`, Dòng ~790):** Chat 1-1 đối chiếu theo `@username`, Nhóm chat đối chiếu theo Tên nhóm (`nickname`). Đảm bảo không bao giờ bỏ qua nhóm dù dữ liệu cũ hay mới.
-3. **Bộ chọn danh sách cuộc trò chuyện (`scan_friends` & `send_messages_to_selected`)**:
-   * Danh sách class hiện tại: `PInfoNickname`, `Nickname`, `[data-e2e='conversation-item']`, `[data-e2e='chat-list-item']`.
+3. **Bộ chọn danh sách & Tự động cuộn (`auto_load_all_conversations`, `scan_friends` & `send_messages_to_selected`)**:
+   * Danh sách class hiện tại: `[data-e2e='conversation-item']`, `[data-e2e='chat-list-item']`, `PInfoNickname`, `Nickname`.
+   * **Cơ chế Auto-scroll:** Tự động cuộn container tin nhắn bên trái để vượt qua giới hạn ~30 item mặc định của TikTok, tải 100% bạn bè và nhóm chat.
+   * **Chống Stale Element:** Luôn lấy lại DOM element tươi mới theo index và gọi `scrollIntoView({block: 'center'})` trước khi click.
    * Tự động bỏ qua các mục hệ thống như `"Yêu cầu tin nhắn"` / `"Message requests"`.
-4. **Ô nhập tin nhắn chat (`send_messages_to_selected`, Dòng ~910)**:
+4. **Ô nhập tin nhắn chat (`send_messages_to_selected`, Dòng ~980)**:
    * TikTok dùng Draft.js (`contenteditable="true"`, `public-DraftStyleDefault-block`).
    * Quy trình gửi chuẩn: Click ô nhập -> Sleep 0.4s -> `send_keys(msg)` -> `send_keys(Keys.RETURN)` -> Click nút Send dự phòng nếu còn hiển thị.
 

@@ -28,7 +28,8 @@ tiktok-streak/
 ├── requirements.txt            # Thư viện phụ thuộc (selenium, python-dotenv)
 ├── run.bat                     # File thực thi một chạm trên hệ điều hành Windows
 ├── python_embed/               # Môi trường Python Portable 3.14 nhúng sẵn (không cần cài Python)
-├── config.json                 # File config root (phục vụ legacy compatibility)
+├── config.json                 # File config root (đã được .gitignore bảo vệ)
+├── config.example.json         # File config mẫu cho người dùng clone mới
 ├── friends.json                # File friends root (đã được .gitignore bảo vệ)
 ├── friends.csv                 # File csv root (đã được .gitignore bảo vệ)
 ├── cookies.json                # File cookies root (đã được .gitignore bảo vệ)

@@ -867,9 +867,132 @@ def find_matching_target(all_friends, chat_details, elem_nickname):
 # QUÉT BẠN BÈ & NHÓM CHAT (SCAN FRIENDS & GROUPS)
 # ----------------------------
 
+def scroll_chat_list_container(browser, step_pixels=800):
+    """
+    Cuộn thanh cuộn của danh sách cuộc trò chuyện bên trái xuống dưới để kích hoạt TikTok nạp thêm tin nhắn.
+    Trả về dict thông tin kết quả: {"found": bool, "scrolled": bool, "at_bottom": bool}.
+    """
+    script = """
+    let container = null;
+    const selectors = [
+        '[data-e2e="chat-list"]',
+        '[data-e2e="conversation-list"]',
+        '[class*="ChatList"]',
+        '[class*="ConversationList"]',
+        '[class*="MessageList"]',
+        'aside [class*="list"]',
+        'div[role="list"]'
+    ];
+    for (const sel of selectors) {
+        const el = document.querySelector(sel);
+        if (el && (el.scrollHeight > el.clientHeight || window.getComputedStyle(el).overflowY === 'auto' || window.getComputedStyle(el).overflowY === 'scroll')) {
+            container = el;
+            break;
+        }
+    }
+    if (!container) {
+        const items = document.querySelectorAll('[data-e2e="conversation-item"], [data-e2e="chat-list-item"], [class*="PInfoNickname"], [class*="Nickname"]');
+        if (items.length > 0) {
+            let p = items[items.length - 1].parentElement;
+            while (p && p !== document.body) {
+                const st = window.getComputedStyle(p);
+                if ((st.overflowY === 'auto' || st.overflowY === 'scroll') && p.scrollHeight > p.clientHeight) {
+                    container = p;
+                    break;
+                }
+                p = p.parentElement;
+            }
+        }
+    }
+    if (container) {
+        const oldTop = container.scrollTop;
+        container.scrollTop = container.scrollHeight;
+        const scrolled = container.scrollTop > oldTop;
+        const atBottom = (container.scrollTop + container.clientHeight >= container.scrollHeight - 30);
+        return { found: true, scrolled: scrolled, at_bottom: atBottom };
+    }
+    const oldY = window.scrollY;
+    window.scrollBy(0, arguments[0] || 800);
+    return { found: false, scrolled: window.scrollY > oldY, at_bottom: false };
+    """
+    try:
+        res = browser.execute_script(script, step_pixels)
+        return res or {"found": False, "scrolled": False, "at_bottom": True}
+    except Exception:
+        return {"found": False, "scrolled": False, "at_bottom": True}
+
+
+def get_conversation_elements(browser):
+    """
+    Tìm danh sách các phần tử cuộc trò chuyện hiện có trong DOM hộp thư TikTok.
+    """
+    selectors = [
+        "//*[@data-e2e='conversation-item']",
+        "//*[@data-e2e='chat-list-item']",
+        "//*[contains(@class, 'PInfoNickname')]",
+        "//p[contains(@class, 'Nickname')]",
+        "//div[contains(@class, 'Nickname')]"
+    ]
+    for sel in selectors:
+        try:
+            elems = browser.find_elements(By.XPATH, sel)
+            if elems:
+                return elems
+        except Exception:
+            continue
+    return []
+
+
+def auto_load_all_conversations(browser, log_cb=print, should_stop=None, max_scrolls=35):
+    """
+    Tự động cuộn danh sách cuộc trò chuyện bên trái để nạp đầy đủ toàn bộ bạn bè và nhóm chat
+    từ cơ chế infinite scroll của TikTok (vượt qua giới hạn mặc định ~30 cuộc trò chuyện).
+    """
+    log_cb("Đang tự động cuộn để nạp toàn bộ danh sách bạn bè & nhóm chat từ TikTok...")
+    no_growth_count = 0
+    last_count = 0
+
+    for scroll_idx in range(1, max_scrolls + 1):
+        if should_stop and should_stop():
+            log_cb("[Dừng] Đã dừng quá trình cuộn nạp danh sách.")
+            break
+
+        scroll_chat_list_container(browser)
+        time.sleep(1.2)
+
+        current_elems = get_conversation_elements(browser)
+        current_count = len(current_elems)
+
+        if current_count > last_count:
+            log_cb(f"   -> Đã tải được {current_count} cuộc trò chuyện (lượt cuộn {scroll_idx})...")
+            last_count = current_count
+            no_growth_count = 0
+        else:
+            no_growth_count += 1
+            if current_elems:
+                try:
+                    browser.execute_script("arguments[0].scrollIntoView({block: 'end'});", current_elems[-1])
+                    time.sleep(1.0)
+                    recheck_elems = get_conversation_elements(browser)
+                    if len(recheck_elems) > current_count:
+                        current_count = len(recheck_elems)
+                        last_count = current_count
+                        no_growth_count = 0
+                        log_cb(f"   -> Đã tải được {current_count} cuộc trò chuyện...")
+                except Exception:
+                    pass
+
+            if no_growth_count >= 3:
+                log_cb(f"   -> Đã tải hết danh sách hộp thư (Tổng cộng: {current_count} cuộc trò chuyện).")
+                break
+
+    return get_conversation_elements(browser)
+
+
 def scan_friends(browser, wait, log_cb=print, should_stop=None, account_id=None):
     """
     Quét danh sách bạn bè và nhóm chat từ hộp thư TikTok cho tài khoản cụ thể.
+    Tự động cuộn để lấy hết 100% cuộc trò chuyện (không bị giới hạn ở ~30 bạn).
     Trả về danh sách bạn bè & nhóm cập nhật.
     """
     log_cb("Đang truy cập hộp thư tin nhắn TikTok...")
@@ -877,27 +1000,35 @@ def scan_friends(browser, wait, log_cb=print, should_stop=None, account_id=None)
     time.sleep(3)
 
     selectors = [
+        "//*[@data-e2e='conversation-item']",
+        "//*[@data-e2e='chat-list-item']",
         "//*[contains(@class, 'PInfoNickname')]",
         "//p[contains(@class, 'Nickname')]",
-        "//div[contains(@class, 'Nickname')]",
-        "//*[@data-e2e='conversation-item']",
-        "//*[@data-e2e='chat-list-item']"
+        "//div[contains(@class, 'Nickname')]"
     ]
-    all_user = []
+    initial_found = False
     for sel in selectors:
         try:
             found = wait.until(EC.presence_of_all_elements_located((By.XPATH, sel)))
             if found:
-                all_user = found
+                initial_found = True
                 break
         except Exception:
             continue
 
-    if not all_user:
+    if not initial_found:
         log_cb("[Cảnh báo] Không tìm thấy cuộc trò chuyện nào trong hộp thư.")
         return load_friends(account_id)
 
-    log_cb(f"Tìm thấy {len(all_user)} cuộc trò chuyện. Bắt đầu thu thập thông tin...")
+    # TỰ ĐỘNG CUỘN ĐỂ TẢI HẾT TOÀN BỘ DANH SÁCH BẠN BÈ (VƯỢT GIỚI HẠN 30 MỤC)
+    all_user = auto_load_all_conversations(browser, log_cb=log_cb, should_stop=should_stop)
+    total_chats = len(all_user)
+
+    if total_chats == 0:
+        log_cb("[Cảnh báo] Không thể đọc danh sách cuộc trò chuyện.")
+        return load_friends(account_id)
+
+    log_cb(f"Tìm thấy tổng cộng {total_chats} cuộc trò chuyện. Bắt đầu thu thập thông tin...")
     current_friends = load_friends(account_id)
 
     # Bản đồ tra cứu bạn bè đã có
@@ -907,20 +1038,38 @@ def scan_friends(browser, wait, log_cb=print, should_stop=None, account_id=None)
     count_new = 0
     count_group = 0
 
-    for idx, user_elem in enumerate(all_user, start=1):
+    for idx in range(1, total_chats + 1):
         if should_stop and should_stop():
             log_cb("[Dừng] Người dùng yêu cầu dừng quá trình quét.")
             break
 
         try:
+            # Lấy lại phần tử mới nhất trong DOM để tránh StaleElementReferenceException
+            fresh_elems = get_conversation_elements(browser)
+            if idx - 1 >= len(fresh_elems):
+                break
+            user_elem = fresh_elems[idx - 1]
+
+            # Đưa phần tử vào giữa màn hình trước khi thao tác
+            try:
+                browser.execute_script("arguments[0].scrollIntoView({block: 'center', inline: 'nearest'});", user_elem)
+                time.sleep(0.2)
+            except Exception:
+                pass
+
             raw_nickname = user_elem.text.strip() or f"Bạn bè {idx}"
 
             # Bỏ qua các mục hệ thống như 'Yêu cầu tin nhắn' (Message Requests)
             if raw_nickname.lower() in ["yêu cầu tin nhắn", "message requests", "tin nhắn yêu cầu"]:
-                log_cb(f"[{idx}/{len(all_user)}] Bỏ qua mục hệ thống: '{raw_nickname}'")
+                log_cb(f"[{idx}/{total_chats}] Bỏ qua mục hệ thống: '{raw_nickname}'")
                 continue
 
-            user_elem.click()
+            # Click an toàn
+            try:
+                user_elem.click()
+            except Exception:
+                browser.execute_script("arguments[0].click();", user_elem)
+
             time.sleep(1.0)
 
             chat_info = extract_chat_details(browser, fallback_nickname=raw_nickname)
@@ -929,7 +1078,7 @@ def scan_friends(browser, wait, log_cb=print, should_stop=None, account_id=None)
             username = chat_info.get("username", "")
 
             if not username:
-                log_cb(f"[{idx}/{len(all_user)}] Không trích xuất được thông tin của: {chat_title}")
+                log_cb(f"[{idx}/{total_chats}] Không trích xuất được thông tin của: {chat_title}")
                 continue
 
             # XỬ LÝ NHÓM CHAT
@@ -939,10 +1088,9 @@ def scan_friends(browser, wait, log_cb=print, should_stop=None, account_id=None)
 
                 if matched_group:
                     matched_group["nickname"] = chat_title
-                    # Chuẩn hóa lại username nhóm nếu trước đó bị lưu ID sai
                     if not matched_group.get("username", "").startswith("[Nhóm]"):
                         matched_group["username"] = f"[Nhóm] {chat_title}"
-                    log_cb(f"[{idx}/{len(all_user)}] [Nhóm đã có] {chat_title}")
+                    log_cb(f"[{idx}/{total_chats}] [Nhóm đã có] {chat_title}")
                 else:
                     new_item = {
                         "username": f"[Nhóm] {chat_title}",
@@ -954,14 +1102,14 @@ def scan_friends(browser, wait, log_cb=print, should_stop=None, account_id=None)
                     nick_map[title_lower] = new_item
                     count_new += 1
                     count_group += 1
-                    log_cb(f"[{idx}/{len(all_user)}] [Nhóm mới] Đã thêm nhóm: {chat_title}")
+                    log_cb(f"[{idx}/{total_chats}] [Nhóm mới] Đã thêm nhóm: {chat_title}")
 
             # XỬ LÝ NGƯỜI DÙNG CÁ NHÂN (1-1)
             else:
                 u_lower = username.lower()
                 if u_lower in user_map:
                     user_map[u_lower]["nickname"] = chat_title
-                    log_cb(f"[{idx}/{len(all_user)}] Đã có: {chat_title} (@{username})")
+                    log_cb(f"[{idx}/{total_chats}] Đã có: {chat_title} (@{username})")
                 else:
                     new_friend = {
                         "username": username,
@@ -972,10 +1120,14 @@ def scan_friends(browser, wait, log_cb=print, should_stop=None, account_id=None)
                     current_friends.append(new_friend)
                     user_map[u_lower] = new_friend
                     count_new += 1
-                    log_cb(f"[{idx}/{len(all_user)}] [Bạn mới] Đã thêm: {chat_title} (@{username})")
+                    log_cb(f"[{idx}/{total_chats}] [Bạn mới] Đã thêm: {chat_title} (@{username})")
+
+            # Lưu tạm định kỳ mỗi 5 bạn bè để tránh mất dữ liệu nếu bị ngắt đột ngột
+            if idx % 5 == 0:
+                save_friends(current_friends, account_id)
 
         except Exception as e:
-            log_cb(f"[{idx}/{len(all_user)}] Bỏ qua do lỗi: {e}")
+            log_cb(f"[{idx}/{total_chats}] Bỏ qua do lỗi: {e}")
 
     save_friends(current_friends, account_id)
     log_cb(f"[Hoàn tất] Đã cập nhật danh sách! ({count_new} mục mới, trong đó có {count_group} nhóm).")
@@ -989,6 +1141,7 @@ def scan_friends(browser, wait, log_cb=print, should_stop=None, account_id=None)
 def send_messages_to_selected(browser, wait, message=None, delay_sec=3, log_cb=print, should_stop=None, account_id=None):
     """
     Gửi tin nhắn cho những bạn bè và nhóm chat có 'enabled' == True của tài khoản cụ thể.
+    Tự động cuộn nạp danh sách để không bỏ sót các bạn bè nằm ngoài top 30 cuộc trò chuyện.
     Hỗ trợ chuẩn xác cho cả:
       - Chat cá nhân 1-1
       - Nhóm chat TikTok
@@ -1010,28 +1163,29 @@ def send_messages_to_selected(browser, wait, message=None, delay_sec=3, log_cb=p
     browser.get("https://www.tiktok.com/messages?lang=vi")
     time.sleep(3)
 
-    all_user = []
     selectors = [
+        "//*[@data-e2e='conversation-item']",
+        "//*[@data-e2e='chat-list-item']",
         "//*[contains(@class, 'PInfoNickname')]",
         "//p[contains(@class, 'Nickname')]",
-        "//div[contains(@class, 'Nickname')]",
-        "//*[@data-e2e='conversation-item']",
-        "//*[@data-e2e='chat-list-item']"
+        "//div[contains(@class, 'Nickname')]"
     ]
     for sel in selectors:
         try:
-            found = wait.until(EC.presence_of_all_elements_located((By.XPATH, sel)))
-            if found:
-                all_user = found
-                break
+            wait.until(EC.presence_of_all_elements_located((By.XPATH, sel)))
+            break
         except Exception:
             continue
+
+    # TỰ ĐỘNG CUỘN ĐỂ TẢI ĐẦY ĐỦ CÁC CUỘC TRÒ CHUYỆN (ĐẢM BẢO TÌM THẤY BẠN BÈ BỊ TRÔI SÂU)
+    all_user = auto_load_all_conversations(browser, log_cb=log_cb, should_stop=should_stop, max_scrolls=25)
+    total_chats = len(all_user)
 
     sent_count = 0
     # Tập hợp các mục tiêu đã gửi trong đợt này để tránh gửi trùng
     sent_target_keys = set()
 
-    for idx, user_elem in enumerate(all_user, start=1):
+    for idx in range(1, total_chats + 1):
         if should_stop and should_stop():
             log_cb("[Dừng] Đã dừng tiến trình gửi tin nhắn.")
             break
@@ -1041,13 +1195,30 @@ def send_messages_to_selected(browser, wait, message=None, delay_sec=3, log_cb=p
             break
 
         try:
+            fresh_elems = get_conversation_elements(browser)
+            if idx - 1 >= len(fresh_elems):
+                break
+            user_elem = fresh_elems[idx - 1]
+
+            # Đưa phần tử vào giữa màn hình trước khi thao tác
+            try:
+                browser.execute_script("arguments[0].scrollIntoView({block: 'center', inline: 'nearest'});", user_elem)
+                time.sleep(0.2)
+            except Exception:
+                pass
+
             raw_nickname = user_elem.text.strip() or f"Mục {idx}"
 
             # Bỏ qua thư mục hệ thống
             if raw_nickname.lower() in ["yêu cầu tin nhắn", "message requests", "tin nhắn yêu cầu"]:
                 continue
 
-            user_elem.click()
+            # Click an toàn
+            try:
+                user_elem.click()
+            except Exception:
+                browser.execute_script("arguments[0].click();", user_elem)
+
             time.sleep(1.0)
 
             # Lấy thông tin chi tiết cuộc trò chuyện hiện tại
