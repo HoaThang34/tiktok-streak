@@ -514,6 +514,7 @@ def render_message_template(template: str, friend: dict = None) -> str:
     friend = friend or {}
     nick = friend.get("nickname") or friend.get("username") or ""
     uname = friend.get("username") or ""
+    clean_uname = uname.replace("[Nhóm]", "").strip() if uname.startswith("[Nhóm]") else uname
 
     tags = {
         "{time}": time.strftime("%H:%M:%S", now),
@@ -523,7 +524,7 @@ def render_message_template(template: str, friend: dict = None) -> str:
         "{minute}": time.strftime("%M", now),
         "{second}": time.strftime("%S", now),
         "{nickname}": nick,
-        "{username}": uname,
+        "{username}": clean_uname if clean_uname else nick,
     }
 
     result = template
@@ -693,63 +694,182 @@ def extract_logged_in_username(browser):
     return ""
 
 
+def extract_chat_details(browser, fallback_nickname=""):
+    """
+    Trích xuất thông tin chi tiết của cuộc trò chuyện đang mở trên TikTok.
+    Trả về dict:
+    {
+        "is_group": bool,        # True nếu là nhóm chat
+        "username": str,         # TikTok @handle nếu là người, hoặc [Nhóm] <Tên nhóm>
+        "title": str             # Tiêu đề chat trong Header hoặc fallback nickname
+    }
+    """
+    info = {
+        "is_group": False,
+        "username": "",
+        "title": fallback_nickname.strip()
+    }
+
+    # 1. Tìm Header của khung chat bên phải
+    header_selectors = [
+        "//*[contains(@class, 'ChatHeader')]",
+        "//*[contains(@class, 'chat-header')]",
+        "//*[contains(@class, 'HeaderWrapper')]",
+        "//*[contains(@class, 'ConversationHeader')]",
+        "//*[@data-e2e='chat-header']"
+    ]
+    header = None
+    for h_sel in header_selectors:
+        try:
+            h_elems = browser.find_elements(By.XPATH, h_sel)
+            for h in h_elems:
+                if h.is_displayed():
+                    header = h
+                    break
+            if header:
+                break
+        except Exception:
+            continue
+
+    header_text = header.text.strip() if header else ""
+    if header_text:
+        lines = [line.strip() for line in header_text.splitlines() if line.strip()]
+        if lines:
+            info["title"] = lines[0]
+
+    # 2. Kiểm tra dấu hiệu NHÓM CHAT (Group Chat)
+    is_group = False
+    lower_header = header_text.lower()
+    group_keywords = ["thành viên", "members", "member", "người", "participants"]
+    if any(kw in lower_header for kw in group_keywords):
+        is_group = True
+
+    if not is_group and header:
+        try:
+            # Nhóm chat thường có icon nhóm hoặc avatar nhóm đặc thù
+            group_indicators = header.find_elements(
+                By.XPATH,
+                ".//*[contains(@class, 'Group') or contains(@class, 'group') or contains(@aria-label, 'nhóm') or contains(@aria-label, 'group')]"
+            )
+            if group_indicators:
+                is_group = True
+        except Exception:
+            pass
+
+    # 3. Trích xuất username người nhận từ Header
+    extracted_user = ""
+    if header:
+        try:
+            # Ưu tiên thẻ a có href chứa /@ trong Header
+            header_links = header.find_elements(By.XPATH, ".//a[contains(@href, '/@')]")
+            for l in reversed(header_links):
+                href = l.get_attribute("href") or ""
+                m = re.search(r"/@([^/?#]+)", href)
+                if m:
+                    u = m.group(1).strip()
+                    if u.lower() not in ["login", "tiktokstudio"] and not href.endswith(("/video/", "/photo/")):
+                        extracted_user = u
+                        break
+        except Exception:
+            pass
+
+        # Nếu chưa tìm thấy thẻ a, tìm cú pháp @handle trong text của Header
+        if not extracted_user:
+            m = re.search(r"@([a-zA-Z0-9._]+)", header_text)
+            if m:
+                extracted_user = m.group(1).strip()
+
+    # Nếu trong Header hoàn toàn không có link profile cá nhân /@ và không có @handle:
+    # -> Đây là NHÓM CHAT!
+    if not extracted_user:
+        is_group = True
+
+    info["is_group"] = is_group
+    chat_title = info["title"] or fallback_nickname.strip() or "Nhóm TikTok"
+    info["title"] = chat_title
+
+    if is_group:
+        info["username"] = f"[Nhóm] {chat_title}"
+    else:
+        info["username"] = extracted_user
+
+    return info
+
+
 def extract_current_chat_username(browser):
     """
-    Trích xuất chính xác username (@handle) của người bạn trong cuộc trò chuyện đang mở trên TikTok.
+    Trích xuất username hoặc định danh của cuộc trò chuyện đang mở (tương thích ngược).
     """
-    # 1. Ưu tiên thẻ a có chứa '@' trong text
-    try:
-        links_with_at = browser.find_elements(By.XPATH, "//a[contains(@href, '/@') and contains(., '@')]")
-        for l in links_with_at:
-            txt = l.text.strip()
-            m = re.search(r"@([a-zA-Z0-9._]+)", txt)
-            if m:
-                return m.group(1)
-    except Exception:
-        pass
+    details = extract_chat_details(browser)
+    return details.get("username", "")
 
-    # 2. Tìm trong khu vực tiêu đề chat (Chat Header)
-    try:
-        header_links = browser.find_elements(By.XPATH, "//*[contains(@class, 'ChatHeader') or contains(@class, 'chat-header') or contains(@class, 'HeaderWrapper') or contains(@class, 'ConversationHeader')]//a[contains(@href, '/@')]")
-        for l in reversed(header_links):
-            href = l.get_attribute("href") or ""
-            m = re.search(r"/@([^/?#]+)", href)
-            if m:
-                u = m.group(1)
-                if u not in ["login", "tiktokstudio"] and not href.endswith(("/video/", "/photo/")):
-                    return u
-    except Exception:
-        pass
 
-    # 3. Quét ngược danh sách link có href /@
-    try:
-        all_links = browser.find_elements(By.XPATH, "//a[contains(@href, '/@')]")
-        for l in reversed(all_links):
-            txt = l.text.strip()
-            if "@" in txt:
-                m = re.search(r"@([a-zA-Z0-9._]+)", txt)
-                if m:
-                    return m.group(1)
-            href = l.get_attribute("href") or ""
-            m = re.search(r"/@([^/?#]+)", href)
-            if m:
-                u = m.group(1)
-                if u not in ["vailuvjk", "login", "tiktokstudio"] and not href.endswith(("/video/", "/photo/")):
-                    return u
-    except Exception:
-        pass
+def find_matching_target(all_friends, chat_details, elem_nickname):
+    """
+    Tìm target trong danh sách bạn bè được chọn (enabled == True) khớp với cuộc trò chuyện hiện tại.
+    Hỗ trợ đối chiếu chuẩn xác cho cả:
+      - Chat 1-1 (ưu tiên theo @username cá nhân)
+      - Nhóm chat (ưu tiên theo Tên nhóm / Nickname)
+      - Nhóm chat đã quét từ phiên bản cũ (vẫn khớp theo Nickname)
+    """
+    selected_targets = [f for f in all_friends if f.get("enabled", True)]
+    if not selected_targets:
+        return None
 
-    return ""
+    elem_nick_clean = elem_nickname.strip().lower()
+    chat_title_clean = chat_details.get("title", "").strip().lower()
+    chat_user_clean = chat_details.get("username", "").strip().lower()
+    is_group = chat_details.get("is_group", False)
+
+    # 1. Nếu là người bình thường và có username cá nhân chuẩn
+    if not is_group and chat_user_clean and not chat_user_clean.startswith("[nhóm]"):
+        for target in selected_targets:
+            t_user = target.get("username", "").strip().lower()
+            if t_user and t_user == chat_user_clean:
+                return target
+
+    # 2. Nếu là Nhóm Chat: So sánh theo TÊN NHÓM (Nickname)
+    for target in selected_targets:
+        t_nick = target.get("nickname", "").strip().lower()
+        t_user = target.get("username", "").strip().lower()
+
+        # Khớp theo Tên nhóm với elem_nickname hoặc title trong header
+        if t_nick and (t_nick == elem_nick_clean or t_nick == chat_title_clean):
+            return target
+
+        # Khớp theo Username có dạng [Nhóm] <Tên>
+        if t_user and (t_user == f"[nhóm] {elem_nick_clean}" or t_user == f"[nhóm] {chat_title_clean}"):
+            return target
+
+        # Khớp nếu username của target trùng với username trích xuất được
+        if chat_user_clean and t_user == chat_user_clean:
+            return target
+
+    # 3. Dự phòng cho trường hợp tên nhóm có chứa ký tự phụ hoặc khoảng trắng lệch nhẹ
+    if is_group and elem_nick_clean:
+        for target in selected_targets:
+            t_nick = target.get("nickname", "").strip().lower()
+            if t_nick and (t_nick in elem_nick_clean or elem_nick_clean in t_nick) and len(t_nick) >= 3:
+                return target
+
+    # 4. Dự phòng cho chat cá nhân nếu đổi username nhưng nickname giữ nguyên
+    if not is_group and elem_nick_clean:
+        for target in selected_targets:
+            t_nick = target.get("nickname", "").strip().lower()
+            if t_nick and (t_nick == elem_nick_clean or t_nick == chat_title_clean):
+                return target
+
+    return None
 
 
 # ----------------------------
-# QUÉT BẠN BÈ (SCAN FRIENDS)
+# QUÉT BẠN BÈ & NHÓM CHAT (SCAN FRIENDS & GROUPS)
 # ----------------------------
 
 def scan_friends(browser, wait, log_cb=print, should_stop=None, account_id=None):
     """
-    Quét danh sách bạn bè từ hộp thư TikTok cho tài khoản cụ thể.
-    Trả về danh sách bạn bè cập nhật.
+    Quét danh sách bạn bè và nhóm chat từ hộp thư TikTok cho tài khoản cụ thể.
+    Trả về danh sách bạn bè & nhóm cập nhật.
     """
     log_cb("Đang truy cập hộp thư tin nhắn TikTok...")
     browser.get("https://www.tiktok.com/messages?lang=vi")
@@ -778,69 +898,112 @@ def scan_friends(browser, wait, log_cb=print, should_stop=None, account_id=None)
 
     log_cb(f"Tìm thấy {len(all_user)} cuộc trò chuyện. Bắt đầu thu thập thông tin...")
     current_friends = load_friends(account_id)
-    existing_map = {f["username"].lower(): f for f in current_friends}
+
+    # Bản đồ tra cứu bạn bè đã có
+    user_map = {f["username"].lower(): f for f in current_friends if f.get("username")}
+    nick_map = {f["nickname"].strip().lower(): f for f in current_friends if f.get("nickname")}
 
     count_new = 0
+    count_group = 0
+
     for idx, user_elem in enumerate(all_user, start=1):
         if should_stop and should_stop():
             log_cb("[Dừng] Người dùng yêu cầu dừng quá trình quét.")
             break
 
         try:
-            nickname = user_elem.text.strip() or f"Bạn bè {idx}"
+            raw_nickname = user_elem.text.strip() or f"Bạn bè {idx}"
+
+            # Bỏ qua các mục hệ thống như 'Yêu cầu tin nhắn' (Message Requests)
+            if raw_nickname.lower() in ["yêu cầu tin nhắn", "message requests", "tin nhắn yêu cầu"]:
+                log_cb(f"[{idx}/{len(all_user)}] Bỏ qua mục hệ thống: '{raw_nickname}'")
+                continue
+
             user_elem.click()
             time.sleep(1.0)
 
-            username = extract_current_chat_username(browser)
+            chat_info = extract_chat_details(browser, fallback_nickname=raw_nickname)
+            is_group = chat_info.get("is_group", False)
+            chat_title = chat_info.get("title") or raw_nickname
+            username = chat_info.get("username", "")
 
             if not username:
-                log_cb(f"[{idx}/{len(all_user)}] Không trích xuất được username của: {nickname}")
+                log_cb(f"[{idx}/{len(all_user)}] Không trích xuất được thông tin của: {chat_title}")
                 continue
 
-            u_lower = username.lower()
-            if u_lower in existing_map:
-                existing_map[u_lower]["nickname"] = nickname
-                log_cb(f"[{idx}/{len(all_user)}] Đã có: {nickname} (@{username})")
+            # XỬ LÝ NHÓM CHAT
+            if is_group:
+                title_lower = chat_title.lower()
+                matched_group = nick_map.get(title_lower)
+
+                if matched_group:
+                    matched_group["nickname"] = chat_title
+                    # Chuẩn hóa lại username nhóm nếu trước đó bị lưu ID sai
+                    if not matched_group.get("username", "").startswith("[Nhóm]"):
+                        matched_group["username"] = f"[Nhóm] {chat_title}"
+                    log_cb(f"[{idx}/{len(all_user)}] [Nhóm đã có] {chat_title}")
+                else:
+                    new_item = {
+                        "username": f"[Nhóm] {chat_title}",
+                        "nickname": chat_title,
+                        "enabled": True,
+                        "status": "Chưa gửi"
+                    }
+                    current_friends.append(new_item)
+                    nick_map[title_lower] = new_item
+                    count_new += 1
+                    count_group += 1
+                    log_cb(f"[{idx}/{len(all_user)}] [Nhóm mới] Đã thêm nhóm: {chat_title}")
+
+            # XỬ LÝ NGƯỜI DÙNG CÁ NHÂN (1-1)
             else:
-                new_friend = {
-                    "username": username,
-                    "nickname": nickname,
-                    "enabled": True,
-                    "status": "Chưa gửi"
-                }
-                current_friends.append(new_friend)
-                existing_map[u_lower] = new_friend
-                count_new += 1
-                log_cb(f"[{idx}/{len(all_user)}] [Mới] Đã thêm: {nickname} (@{username})")
+                u_lower = username.lower()
+                if u_lower in user_map:
+                    user_map[u_lower]["nickname"] = chat_title
+                    log_cb(f"[{idx}/{len(all_user)}] Đã có: {chat_title} (@{username})")
+                else:
+                    new_friend = {
+                        "username": username,
+                        "nickname": chat_title,
+                        "enabled": True,
+                        "status": "Chưa gửi"
+                    }
+                    current_friends.append(new_friend)
+                    user_map[u_lower] = new_friend
+                    count_new += 1
+                    log_cb(f"[{idx}/{len(all_user)}] [Bạn mới] Đã thêm: {chat_title} (@{username})")
 
         except Exception as e:
             log_cb(f"[{idx}/{len(all_user)}] Bỏ qua do lỗi: {e}")
 
     save_friends(current_friends, account_id)
-    log_cb(f"[Hoàn tất] Đã cập nhật danh sách bạn bè! ({count_new} bạn mới).")
+    log_cb(f"[Hoàn tất] Đã cập nhật danh sách! ({count_new} mục mới, trong đó có {count_group} nhóm).")
     return current_friends
 
 
 # ----------------------------
-# GỬI TIN NHẮN THEO DANH SÁCH CHỌN
+# GỬI TIN NHẮN THEO DANH SÁCH CHỌN (BẠN BÈ & NHÓM CHAT)
 # ----------------------------
 
 def send_messages_to_selected(browser, wait, message=None, delay_sec=3, log_cb=print, should_stop=None, account_id=None):
     """
-    Chỉ gửi tin nhắn cho những bạn bè có 'enabled' == True của tài khoản cụ thể.
+    Gửi tin nhắn cho những bạn bè và nhóm chat có 'enabled' == True của tài khoản cụ thể.
+    Hỗ trợ chuẩn xác cho cả:
+      - Chat cá nhân 1-1
+      - Nhóm chat TikTok
     Trả về (sent_count, total_count).
     """
     config = load_config(account_id)
     msg_text = message or config.get("message", "Chào {nickname}, rep chuỗi streak nè {time}!")
 
     all_friends = load_friends(account_id)
-    selected_targets = {f["username"].lower(): f for f in all_friends if f.get("enabled", True)}
+    selected_targets = [f for f in all_friends if f.get("enabled", True)]
 
     if not selected_targets:
-        log_cb("[Thông báo] Không có bạn bè nào được chọn để gửi tin nhắn.")
+        log_cb("[Thông báo] Không có bạn bè hoặc nhóm nào được chọn để gửi tin nhắn.")
         return 0, 0
 
-    log_cb(f"Bắt đầu gửi tin nhắn cho {len(selected_targets)} bạn bè đã được chọn...")
+    log_cb(f"Bắt đầu gửi tin nhắn cho {len(selected_targets)} mục (bạn bè & nhóm) đã chọn...")
     log_cb(f"Nội dung gửi: \"{msg_text}\" | Giãn cách an toàn: {delay_sec}s")
 
     browser.get("https://www.tiktok.com/messages?lang=vi")
@@ -864,26 +1027,50 @@ def send_messages_to_selected(browser, wait, message=None, delay_sec=3, log_cb=p
             continue
 
     sent_count = 0
+    # Tập hợp các mục tiêu đã gửi trong đợt này để tránh gửi trùng
+    sent_target_keys = set()
+
     for idx, user_elem in enumerate(all_user, start=1):
         if should_stop and should_stop():
             log_cb("[Dừng] Đã dừng tiến trình gửi tin nhắn.")
             break
 
+        if sent_count >= len(selected_targets):
+            log_cb("[Hoàn thành] Đã gửi đủ cho toàn bộ các mục được chọn!")
+            break
+
         try:
+            raw_nickname = user_elem.text.strip() or f"Mục {idx}"
+
+            # Bỏ qua thư mục hệ thống
+            if raw_nickname.lower() in ["yêu cầu tin nhắn", "message requests", "tin nhắn yêu cầu"]:
+                continue
+
             user_elem.click()
             time.sleep(1.0)
 
-            username = extract_current_chat_username(browser)
-            if not username:
+            # Lấy thông tin chi tiết cuộc trò chuyện hiện tại
+            chat_info = extract_chat_details(browser, fallback_nickname=raw_nickname)
+            is_group = chat_info.get("is_group", False)
+
+            # Tìm xem cuộc trò chuyện này có thuộc danh sách được chọn không
+            target_friend = find_matching_target(all_friends, chat_info, elem_nickname=raw_nickname)
+
+            if not target_friend:
+                # Không nằm trong danh sách chọn gửi -> Bỏ qua
                 continue
 
-            u_lower = username.lower()
-            if u_lower not in selected_targets:
+            target_key = (target_friend.get("username", "") or target_friend.get("nickname", "")).lower()
+            if target_key in sent_target_keys:
+                # Đã gửi cho mục này rồi -> Bỏ qua
                 continue
 
-            target_friend = selected_targets[u_lower]
             actual_msg = render_message_template(msg_text, target_friend)
-            log_cb(f"-> Đang gửi tin nhắn cho: {target_friend['nickname']} (@{username}): \"{actual_msg}\"")
+
+            if is_group:
+                log_cb(f"-> Đang gửi tin nhắn vào nhóm '{target_friend['nickname']}': \"{actual_msg}\"")
+            else:
+                log_cb(f"-> Đang gửi tin nhắn cho: {target_friend['nickname']} (@{target_friend.get('username', '')}): \"{actual_msg}\"")
 
             input_selectors = [
                 "//div[contains(@class, 'public-DraftStyleDefault-block')]",
@@ -894,32 +1081,51 @@ def send_messages_to_selected(browser, wait, message=None, delay_sec=3, log_cb=p
             for i_sel in input_selectors:
                 try:
                     boxes = browser.find_elements(By.XPATH, i_sel)
-                    if boxes:
-                        message_box = boxes[0]
+                    for b in boxes:
+                        if b.is_displayed():
+                            message_box = b
+                            break
+                    if message_box:
                         break
                 except Exception:
                     continue
 
             if message_box:
                 message_box.click()
-                time.sleep(0.5)
+                time.sleep(0.4)
                 message_box.send_keys(actual_msg)
+                time.sleep(0.3)
                 message_box.send_keys(Keys.RETURN)
+                time.sleep(0.5)
+
+                # Nút Send dự phòng nếu phím Enter chưa gửi được
+                try:
+                    send_buttons = browser.find_elements(By.XPATH, "//*[@data-e2e='chat-send-btn'] | //button[contains(@class, 'send')]")
+                    for btn in send_buttons:
+                        if btn.is_displayed() and btn.is_enabled():
+                            btn.click()
+                            time.sleep(0.4)
+                            break
+                except Exception:
+                    pass
 
                 current_time = time.strftime("%H:%M:%S %d/%m/%Y")
                 target_friend["status"] = f"Đã gửi ({current_time})"
                 save_friends(all_friends, account_id)
 
                 sent_count += 1
-                log_cb(f"   [Thành công] Đã gửi tới @{username}! Nghỉ {delay_sec}s...")
+                sent_target_keys.add(target_key)
+
+                target_display = f"nhóm '{target_friend['nickname']}'" if is_group else f"@{target_friend.get('username', '')}"
+                log_cb(f"   [Thành công] Đã gửi tới {target_display}! Nghỉ {delay_sec}s...")
                 time.sleep(delay_sec)
             else:
-                log_cb(f"   [Thất bại] Không tìm thấy ô nhập tin nhắn của @{username}")
+                log_cb(f"   [Thất bại] Không tìm thấy ô nhập tin nhắn của mục '{raw_nickname}'")
                 target_friend["status"] = "Lỗi ô chat"
                 save_friends(all_friends, account_id)
 
         except Exception as e:
             log_cb(f"   [Lỗi] Không thể gửi cho mục {idx}: {e}")
 
-    log_cb(f"[Hoàn thành] Đã gửi tin nhắn cho {sent_count}/{len(selected_targets)} bạn bè được chọn.")
+    log_cb(f"[Hoàn thành] Đã gửi tin nhắn cho {sent_count}/{len(selected_targets)} mục được chọn.")
     return sent_count, len(selected_targets)
