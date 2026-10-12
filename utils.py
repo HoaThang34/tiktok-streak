@@ -1481,13 +1481,26 @@ def scan_friends(browser, wait, log_cb=print, should_stop=None, account_id=None)
 # GỬI TIN NHẮN THEO DANH SÁCH CHỌN (BẠN BÈ & NHÓM CHAT)
 # ----------------------------
 
+def is_friend_replied_today(friend, today_date_str=None):
+    """
+    Kiểm tra xem bạn bè hoặc nhóm này đã được gửi tin nhắn chuỗi trong ngày hôm nay chưa.
+    Status thường có dạng: 'Đã gửi (10:15:30 13/10/2026)'
+    """
+    if not today_date_str:
+        today_date_str = time.strftime("%d/%m/%Y")
+    status = str(friend.get("status") or "").strip()
+    return status.startswith("Đã gửi") and (today_date_str in status)
+
+
 def send_messages_to_selected(browser, wait, message=None, delay_sec=3, log_cb=print, should_stop=None, account_id=None):
     """
-    Gửi tin nhắn cho những bạn bè và nhóm chat có 'enabled' == True của tài khoản cụ thể.
-    Tự động cuộn nạp danh sách để không bỏ sót các bạn bè nằm ngoài top 30 cuộc trò chuyện.
-    Hỗ trợ chuẩn xác cho cả:
-      - Chat cá nhân 1-1
-      - Nhóm chat TikTok
+    Gửi tin nhắn chuỗi (streak) cho danh sách bạn bè và nhóm chat đã chọn (enabled == True).
+    Áp dụng thuật toán quét từ trên xuống dưới tương tự như quét bạn bè (scan_friends):
+      - Quét tuần tự từng cuộc trò chuyện từ trên xuống dưới bằng định vị liền kề.
+      - Nếu ID cuộc trò chuyện thuộc danh sách rep chuỗi (enabled == True)
+        VÀ ID này chưa được rep chuỗi trong ngày hôm nay -> Gửi tin nhắn chuỗi.
+      - Nếu số lượng ID đã rep chuỗi trong ngày == số người cần rep chuỗi -> Dừng ngay lập tức.
+      - Nếu ID người trước == ID người hiện tại (đã đến cuối hộp thư) -> Dừng.
     Trả về (sent_count, total_count).
     """
     config = load_config(account_id)
@@ -1497,12 +1510,35 @@ def send_messages_to_selected(browser, wait, message=None, delay_sec=3, log_cb=p
     selected_targets = [f for f in all_friends if f.get("enabled", True)]
 
     if not selected_targets:
-        log_cb("[Thông báo] Không có bạn bè hoặc nhóm nào được chọn để gửi tin nhắn.")
+        log_cb("[Thông báo] Không có bạn bè hoặc nhóm nào trong danh sách rep chuỗi được chọn (enabled = True).")
         return 0, 0
 
-    log_cb(f"Bắt đầu gửi tin nhắn cho {len(selected_targets)} mục (bạn bè & nhóm) đã chọn...")
+    today_str = time.strftime("%d/%m/%Y")
+
+    def get_friend_key(f):
+        u = (f.get("username") or "").strip().lower()
+        n = (f.get("nickname") or "").strip().lower()
+        return u or n
+
+    # Tập hợp các mục tiêu đã được rep chuỗi trong ngày hôm nay
+    replied_ids_today = set()
+    for f in selected_targets:
+        if is_friend_replied_today(f, today_str):
+            replied_ids_today.add(get_friend_key(f))
+
+    total_need_count = len(selected_targets)
+    already_sent_count = len(replied_ids_today)
+
+    log_cb(f"Bắt đầu quy trình gửi chuỗi cho {total_need_count} mục đã chọn...")
+    log_cb(f"Ngày hiện tại: {today_str} | Đã rep hôm nay: {already_sent_count}/{total_need_count} mục")
     log_cb(f"Nội dung gửi: \"{msg_text}\" | Giãn cách an toàn: {delay_sec}s")
 
+    # Kiểm tra điều kiện dừng: nếu số lượng id đã rep chuỗi == số người cần rep chuỗi -> dừng
+    if len(replied_ids_today) >= total_need_count:
+        log_cb(f"[Hoàn tất] Toàn bộ {total_need_count} mục trong danh sách rep chuỗi đều đã được gửi trong ngày hôm nay ({today_str})! Không cần gửi thêm.")
+        return len(replied_ids_today), total_need_count
+
+    log_cb("Đang truy cập hộp thư tin nhắn TikTok...")
     browser.get("https://www.tiktok.com/messages?lang=vi")
     time.sleep(3)
 
@@ -1513,99 +1549,274 @@ def send_messages_to_selected(browser, wait, message=None, delay_sec=3, log_cb=p
         "//p[contains(@class, 'Nickname')]",
         "//div[contains(@class, 'Nickname')]"
     ]
+    initial_found = False
     for sel in selectors:
         try:
-            wait.until(EC.presence_of_all_elements_located((By.XPATH, sel)))
-            break
+            found = wait.until(EC.presence_of_all_elements_located((By.XPATH, sel)))
+            if found:
+                initial_found = True
+                break
         except Exception:
             continue
 
-    # TỰ ĐỘNG CUỘN ĐỂ TẢI ĐẦY ĐỦ CÁC CUỘC TRÒ CHUYỆN (ĐẢM BẢO TÌM THẤY BẠN BÈ BỊ TRÔI SÂU)
-    all_user = auto_load_all_conversations(browser, log_cb=log_cb, should_stop=should_stop, max_scrolls=25)
-    total_chats = len(all_user)
+    if not initial_found:
+        log_cb("[Cảnh báo] Không tìm thấy cuộc trò chuyện nào trong hộp thư.")
+        return len(replied_ids_today), total_need_count
 
-    sent_count = 0
-    # Tập hợp các mục tiêu đã gửi trong đợt này để tránh gửi trùng
-    sent_target_keys = set()
+    # Cuộn container danh sách cuộc trò chuyện lên trên cùng (scrollTop = 0)
+    try:
+        browser.execute_script("""
+            const selectors = ['[data-e2e="chat-list"]', '[data-e2e="conversation-list"]', '[class*="ChatList"]', 'aside [class*="list"]'];
+            for (const sel of selectors) {
+                const el = document.querySelector(sel);
+                if (el) { el.scrollTop = 0; break; }
+            }
+        """)
+        time.sleep(0.5)
+    except Exception:
+        pass
 
-    for idx in range(1, total_chats + 1):
+    log_cb("Bắt đầu quét hộp thư từ trên xuống dưới để gửi chuỗi...")
+    newly_sent_count = 0
+    count_scanned = 0
+
+    prev_id = None
+    current_elem = None
+    current_sig = None
+    scanned_identities = set()
+    consecutive_at_end = 0
+
+    while True:
         if should_stop and should_stop():
-            log_cb("[Dừng] Đã dừng tiến trình gửi tin nhắn.")
+            log_cb("[Dừng] Người dùng yêu cầu dừng quá trình gửi chuỗi.")
             break
 
-        if sent_count >= len(selected_targets):
-            log_cb("[Hoàn thành] Đã gửi đủ cho toàn bộ các mục được chọn!")
+        # Điều kiện dừng: nếu số lượng id đã rep chuỗi == số người cần rep chuỗi -> dừng
+        if len(replied_ids_today) >= total_need_count:
+            log_cb(f"[Hoàn tất] Số lượng ID đã rep chuỗi ({len(replied_ids_today)}) đã đạt đủ số người cần rep chuỗi ({total_need_count}). Dừng tiến trình!")
             break
 
-        try:
-            fresh_elems = get_conversation_elements(browser)
-            if idx - 1 >= len(fresh_elems):
-                break
-            user_elem = fresh_elems[idx - 1]
+        # 1. Tìm phần tử cuộc trò chuyện kế tiếp liền kề (ngay sau current_elem)
+        next_target = find_next_conversation(browser, current_elem, current_sig)
 
-            # Đưa phần tử vào giữa màn hình trước khi thao tác
+        # Kiểm tra nếu next_target đã nằm trong scanned_identities (do danh sách có thể nhảy lên đầu khi vừa gửi tin)
+        if next_target and next_target != "AT_END":
             try:
-                browser.execute_script("arguments[0].scrollIntoView({block: 'center', inline: 'nearest'});", user_elem)
-                time.sleep(0.2)
+                t = next_target.text.strip().lower()
+                first_l = t.splitlines()[0] if t else ""
+                if first_l and first_l in scanned_identities:
+                    next_target = None
             except Exception:
                 pass
 
-            raw_nickname = user_elem.text.strip() or f"Mục {idx}"
+        # 2. Xử lý trường hợp đã đến cuối DOM hiện tại ("AT_END") hoặc không tìm thấy bằng JS
+        if next_target == "AT_END" or next_target is None:
+            # Cuộn container xuống một bước vừa phải (350px) để TikTok nạp thêm item tiếp theo
+            scroll_chat_list_container(browser, step_pixels=350)
+            time.sleep(1.0)
 
-            # Bỏ qua thư mục hệ thống
-            if raw_nickname.lower() in ["yêu cầu tin nhắn", "message requests", "tin nhắn yêu cầu"]:
-                continue
+            # Đưa phần tử hiện tại vào giữa tầm nhìn nếu có
+            if current_elem:
+                try:
+                    browser.execute_script("arguments[0].scrollIntoView({block: 'center', inline: 'nearest'});", current_elem)
+                    time.sleep(0.4)
+                except Exception:
+                    pass
 
-            # Click an toàn
+            # Thử tìm lại phần tử kế tiếp sau khi cuộn
+            retry_target = find_next_conversation(browser, current_elem, current_sig)
+            if retry_target and retry_target != "AT_END":
+                try:
+                    t = retry_target.text.strip().lower()
+                    first_l = t.splitlines()[0] if t else ""
+                    if first_l and first_l not in scanned_identities:
+                        next_target = retry_target
+                        consecutive_at_end = 0
+                except Exception:
+                    pass
+
+            if not next_target or next_target == "AT_END":
+                # Fallback: duyệt DOM tìm phần tử đầu tiên chưa quét
+                elems = get_conversation_elements(browser)
+                for el in elems:
+                    try:
+                        t = el.text.strip().lower()
+                        first_l = t.splitlines()[0] if t else ""
+                        if first_l and first_l not in scanned_identities:
+                            next_target = el
+                            break
+                    except Exception:
+                        continue
+
+                if next_target and next_target != "AT_END":
+                    consecutive_at_end = 0
+                else:
+                    consecutive_at_end += 1
+                    # Nếu đã cuộn 2 lần mà không có phần tử mới nào xuất hiện ở phía dưới
+                    if consecutive_at_end >= 2:
+                        log_cb(f"   -> [Dừng quét] ID người trước ('{prev_id}') trùng với người cuối cùng của hộp thư (không thể quét thêm)!")
+                        break
+                    else:
+                        time.sleep(1.0)
+                        continue
+        else:
+            consecutive_at_end = 0
+
+        user_elem = next_target
+
+        # Đưa phần tử vào giữa màn hình trước khi thao tác
+        try:
+            browser.execute_script("arguments[0].scrollIntoView({block: 'center', inline: 'nearest'});", user_elem)
+            time.sleep(0.2)
+        except Exception:
+            pass
+
+        raw_text = ""
+        try:
+            raw_text = user_elem.text.strip()
+        except Exception:
+            time.sleep(0.3)
+            continue
+
+        lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+        raw_nickname = lines[0] if lines else f"Mục {count_scanned + 1}"
+
+        # Đánh dấu cờ data-streak-current lên phần tử này để vòng lặp sau định vị chính xác
+        try:
+            browser.execute_script("arguments[0].setAttribute('data-streak-current', 'true');", user_elem)
+        except Exception:
+            pass
+
+        # Cập nhật phần tử hiện tại và chữ ký text
+        current_elem = user_elem
+        current_sig = raw_text
+
+        # Bỏ qua các mục hệ thống như 'Yêu cầu tin nhắn' (Message Requests)
+        if any(sys_kw in raw_nickname.lower() for sys_kw in ["yêu cầu tin nhắn", "message requests", "tin nhắn yêu cầu"]):
+            continue
+
+        # Click an toàn CHỈ VÀO TEXT/NICKNAME để mở chat (TUYỆT ĐỐI TRÁNH AVATAR STORY)
+        clicked = click_conversation_chat_safe(browser, user_elem)
+        if not clicked:
             try:
                 user_elem.click()
             except Exception:
-                browser.execute_script("arguments[0].click();", user_elem)
-
-            time.sleep(1.0)
-
-            # Lấy thông tin chi tiết cuộc trò chuyện hiện tại
-            chat_info = extract_chat_details(browser, fallback_nickname=raw_nickname)
-            is_group = chat_info.get("is_group", False)
-
-            # Tìm xem cuộc trò chuyện này có thuộc danh sách được chọn không
-            target_friend = find_matching_target(all_friends, chat_info, elem_nickname=raw_nickname)
-
-            if not target_friend:
-                # Không nằm trong danh sách chọn gửi -> Bỏ qua
-                continue
-
-            target_key = (target_friend.get("username", "") or target_friend.get("nickname", "")).lower()
-            if target_key in sent_target_keys:
-                # Đã gửi cho mục này rồi -> Bỏ qua
-                continue
-
-            actual_msg = render_message_template(msg_text, target_friend)
-
-            if is_group:
-                log_cb(f"-> Đang gửi tin nhắn vào nhóm '{target_friend['nickname']}': \"{actual_msg}\"")
-            else:
-                log_cb(f"-> Đang gửi tin nhắn cho: {target_friend['nickname']} (@{target_friend.get('username', '')}): \"{actual_msg}\"")
-
-            input_selectors = [
-                "//div[contains(@class, 'public-DraftStyleDefault-block')]",
-                "//div[@contenteditable='true']",
-                "//*[@data-e2e='chat-input']"
-            ]
-            message_box = None
-            for i_sel in input_selectors:
                 try:
-                    boxes = browser.find_elements(By.XPATH, i_sel)
-                    for b in boxes:
-                        if b.is_displayed():
-                            message_box = b
-                            break
-                    if message_box:
-                        break
+                    browser.execute_script("arguments[0].click();", user_elem)
                 except Exception:
-                    continue
+                    pass
 
-            if message_box:
+        time.sleep(0.8)
+
+        # Đóng Story nếu vô tình bị mở
+        close_story_if_open(browser, log_cb=log_cb)
+
+        # Trích xuất thông tin cuộc trò chuyện ở khung bên phải
+        chat_info = extract_chat_details(browser, fallback_nickname=raw_nickname)
+        is_group = chat_info.get("is_group", False)
+        chat_title = chat_info.get("title") or raw_nickname
+        username = chat_info.get("username", "")
+
+        # Định danh ID duy nhất của người / cuộc trò chuyện hiện tại
+        if is_group:
+            current_id = f"[nhóm] {chat_title}".strip().lower()
+        else:
+            current_id = (username or chat_title or raw_nickname).strip().lower()
+
+        # =========================================================================
+        # ĐIỀU KIỆN DỪNG: CHỈ DỪNG LẠI NẾU ID NGƯỜI TRƯỚC == ID NGƯỜI HIỆN TẠI
+        # =========================================================================
+        if prev_id is not None and current_id == prev_id:
+            time.sleep(1.0)
+            recheck_info = extract_chat_details(browser, fallback_nickname=raw_nickname)
+            recheck_is_group = recheck_info.get("is_group", False)
+            recheck_title = recheck_info.get("title") or raw_nickname
+            recheck_user = recheck_info.get("username", "")
+            if recheck_is_group:
+                recheck_id = f"[nhóm] {recheck_title}".strip().lower()
+            else:
+                recheck_id = (recheck_user or recheck_title or raw_nickname).strip().lower()
+
+            if recheck_id == prev_id:
+                log_cb(f"   -> [Dừng quét] ID người trước ('{prev_id}') == ID người hiện tại ('{current_id}'). Đã đến cuộc trò chuyện cuối cùng của hộp thư!")
+                break
+            else:
+                current_id = recheck_id
+                chat_info = recheck_info
+                is_group = recheck_is_group
+                chat_title = recheck_title
+                username = recheck_user
+
+        prev_id = current_id
+        count_scanned += 1
+        scanned_identities.add(current_id)
+        if username:
+            scanned_identities.add(username.lower())
+        scanned_identities.add(chat_title.strip().lower())
+        scanned_identities.add(raw_nickname.strip().lower())
+
+        # =========================================================================
+        # KIỂM TRA ĐIỀU KIỆN GỬI CHUỖI:
+        # Nếu id == id trong danh sách rep chuỗi && id chưa được rep chuỗi trong ngày hôm nay
+        # -> gửi tin nhắn chuỗi
+        # =========================================================================
+        target_friend = find_matching_target(selected_targets, chat_info, elem_nickname=raw_nickname)
+        if not target_friend:
+            # Thử đối chiếu trực tiếp qua ID với danh sách rep chuỗi
+            for tf in selected_targets:
+                u_tf = (tf.get("username") or "").strip().lower()
+                n_tf = (tf.get("nickname") or "").strip().lower()
+                if current_id in [u_tf, n_tf, f"[nhóm] {n_tf}", f"[nhóm] {u_tf}"]:
+                    target_friend = tf
+                    break
+                if u_tf and u_tf in [current_id, username.lower(), raw_nickname.lower(), chat_title.lower()]:
+                    target_friend = tf
+                    break
+
+        if not target_friend:
+            # Không nằm trong danh sách rep chuỗi -> tiếp tục quét người kế tiếp
+            continue
+
+        target_key = get_friend_key(target_friend)
+
+        # Kiểm tra nếu id đã được rep chuỗi trong ngày hôm nay
+        if is_friend_replied_today(target_friend, today_str) or target_key in replied_ids_today:
+            log_cb(f"[{count_scanned}] [Bỏ qua] {target_friend['nickname']}: Đã rep chuỗi trong ngày hôm nay ({today_str}) rồi.")
+            replied_ids_today.add(target_key)
+            # Điều kiện dừng: nếu số lượng id đã rep chuỗi == số người cần rep chuỗi -> dừng
+            if len(replied_ids_today) >= total_need_count:
+                log_cb(f"[Hoàn tất] Số lượng ID đã rep chuỗi ({len(replied_ids_today)}) đã đạt đủ số người cần rep chuỗi ({total_need_count}). Dừng tiến trình!")
+                break
+            continue
+
+        # ID nằm trong danh sách và CHƯA được rep chuỗi hôm nay -> GỬI TIN NHẮN CHUỖI
+        actual_msg = render_message_template(msg_text, target_friend)
+
+        if is_group:
+            log_cb(f"[{count_scanned}] -> Đang gửi tin nhắn vào nhóm '{target_friend['nickname']}': \"{actual_msg}\"")
+        else:
+            log_cb(f"[{count_scanned}] -> Đang gửi tin nhắn cho: {target_friend['nickname']} (@{target_friend.get('username', '')}): \"{actual_msg}\"")
+
+        input_selectors = [
+            "//div[contains(@class, 'public-DraftStyleDefault-block')]",
+            "//div[@contenteditable='true']",
+            "//*[@data-e2e='chat-input']"
+        ]
+        message_box = None
+        for i_sel in input_selectors:
+            try:
+                boxes = browser.find_elements(By.XPATH, i_sel)
+                for b in boxes:
+                    if b.is_displayed():
+                        message_box = b
+                        break
+                if message_box:
+                    break
+            except Exception:
+                continue
+
+        if message_box:
+            try:
                 message_box.click()
                 time.sleep(0.4)
                 message_box.send_keys(actual_msg)
@@ -1628,19 +1839,24 @@ def send_messages_to_selected(browser, wait, message=None, delay_sec=3, log_cb=p
                 target_friend["status"] = f"Đã gửi ({current_time})"
                 save_friends(all_friends, account_id)
 
-                sent_count += 1
-                sent_target_keys.add(target_key)
+                newly_sent_count += 1
+                replied_ids_today.add(target_key)
 
                 target_display = f"nhóm '{target_friend['nickname']}'" if is_group else f"@{target_friend.get('username', '')}"
-                log_cb(f"   [Thành công] Đã gửi tới {target_display}! Nghỉ {delay_sec}s...")
+                log_cb(f"   [Thành công] Đã gửi tới {target_display}! ({len(replied_ids_today)}/{total_need_count}) | Nghỉ {delay_sec}s...")
+
+                # Điều kiện dừng: nếu số lượng id đã rep chuỗi == số người cần rep chuỗi -> dừng
+                if len(replied_ids_today) >= total_need_count:
+                    log_cb(f"[Hoàn tất] Số lượng ID đã rep chuỗi ({len(replied_ids_today)}) đã đạt đủ số người cần rep chuỗi ({total_need_count}). Dừng tiến trình!")
+                    break
+
                 time.sleep(delay_sec)
-            else:
-                log_cb(f"   [Thất bại] Không tìm thấy ô nhập tin nhắn của mục '{raw_nickname}'")
-                target_friend["status"] = "Lỗi ô chat"
-                save_friends(all_friends, account_id)
+            except Exception as send_err:
+                log_cb(f"   [Lỗi khi gửi] {send_err}")
+        else:
+            log_cb(f"   [Thất bại] Không tìm thấy ô nhập tin nhắn của mục '{raw_nickname}'")
+            target_friend["status"] = "Lỗi ô chat"
+            save_friends(all_friends, account_id)
 
-        except Exception as e:
-            log_cb(f"   [Lỗi] Không thể gửi cho mục {idx}: {e}")
-
-    log_cb(f"[Hoàn thành] Đã gửi tin nhắn cho {sent_count}/{len(selected_targets)} mục được chọn.")
-    return sent_count, len(selected_targets)
+    log_cb(f"[Hoàn tất] Đã gửi {newly_sent_count} tin nhắn mới. Tổng cộng hôm nay đã rep chuỗi: {len(replied_ids_today)}/{total_need_count} mục.")
+    return len(replied_ids_today), total_need_count
