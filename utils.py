@@ -989,10 +989,230 @@ def auto_load_all_conversations(browser, log_cb=print, should_stop=None, max_scr
     return get_conversation_elements(browser)
 
 
+def close_story_if_open(browser, log_cb=print):
+    """
+    Kiểm tra và tự động đóng ngay lập tức nếu vô tình bị mở Story của TikTok,
+    đảm bảo luôn duy trì ở giao diện hộp thư tin nhắn.
+    """
+    try:
+        current_url = (browser.current_url or "").lower()
+        is_story_url = "/story/" in current_url or "/photo/" in current_url or "story_id=" in current_url
+
+        script_check = """
+        const storyIndicators = [
+            '[data-e2e="story-player"]',
+            '[class*="StoryPlayer"]',
+            '[class*="StoryViewer"]',
+            '[class*="story-container"]',
+            '[aria-label*="story" i]'
+        ];
+        for (const sel of storyIndicators) {
+            const el = document.querySelector(sel);
+            if (el && el.offsetParent !== null) return true;
+        }
+        return false;
+        """
+        is_story_dom = False
+        try:
+            is_story_dom = bool(browser.execute_script(script_check))
+        except Exception:
+            pass
+
+        if is_story_url or is_story_dom:
+            log_cb("   -> [Phát hiện Story đang mở] Đang tự động đóng Story...")
+            # 1. Nhấn ESC
+            try:
+                from selenium.webdriver.common.action_chains import ActionChains
+                ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+                time.sleep(0.4)
+            except Exception:
+                pass
+
+            # 2. Tìm nút Close của Story và click
+            script_close = """
+            const closeBtns = [
+                '[data-e2e="close-button"]',
+                'button[aria-label*="close" i]',
+                'button[aria-label*="đóng" i]',
+                '[class*="CloseButton"]',
+                '[class*="close-btn"]',
+                'button.close'
+            ];
+            for (const sel of closeBtns) {
+                const btn = document.querySelector(sel);
+                if (btn && btn.offsetParent !== null) {
+                    btn.click();
+                    return true;
+                }
+            }
+            return false;
+            """
+            try:
+                browser.execute_script(script_close)
+                time.sleep(0.5)
+            except Exception:
+                pass
+
+            # 3. Nếu vẫn còn ở URL story, điều hướng quay lại messages
+            new_url = (browser.current_url or "").lower()
+            if "/story/" in new_url or "/photo/" in new_url:
+                browser.get("https://www.tiktok.com/messages?lang=vi")
+                time.sleep(2.5)
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def click_conversation_chat_safe(browser, elem):
+    """
+    Click an toàn vào một cuộc trò chuyện để mở hộp chat:
+    ƯU TIÊN click vào Nickname/Text ở bên phải,
+    TUYỆT ĐỐI KHÔNG click vào Avatar chứa viền Story bên trái để tránh tự bật Story.
+    """
+    try:
+        script = """
+        const card = arguments[0];
+        if (!card) return false;
+
+        // Vô hiệu hóa liên kết story hoặc avatar nếu có trong card này
+        const storyLinks = card.querySelectorAll('a[href*="/story/"], a[href*="/photo/"], [class*="Story"], [class*="Avatar"] a');
+        storyLinks.forEach(a => {
+            a.style.pointerEvents = 'none';
+        });
+
+        // Tìm phần tử Nickname / Text để click trực tiếp vào text
+        const textSelectors = [
+            '[class*="PInfoNickname"]',
+            'p[class*="Nickname"]',
+            'div[class*="Nickname"]',
+            '[class*="Info"]',
+            '[class*="Content"]',
+            'p',
+            'span'
+        ];
+        for (const sel of textSelectors) {
+            const textEl = card.querySelector(sel);
+            if (textEl && textEl.offsetParent !== null && !textEl.closest('a[href*="/story/"]')) {
+                textEl.scrollIntoView({block: 'center', inline: 'nearest'});
+                textEl.click();
+                return true;
+            }
+        }
+
+        // Fallback: click vào mép phải của card (tránh avatar bên trái)
+        card.scrollIntoView({block: 'center', inline: 'nearest'});
+        const rect = card.getBoundingClientRect();
+        const evt = new MouseEvent('click', {
+            bubbles: true,
+            cancelable: true,
+            view: window,
+            clientX: rect.left + Math.max(80, rect.width * 0.6),
+            clientY: rect.top + rect.height / 2
+        });
+        card.dispatchEvent(evt);
+        return true;
+        """
+        res = browser.execute_script(script, elem)
+        return bool(res)
+    except Exception:
+        try:
+            elem.click()
+            return True
+        except Exception:
+            return False
+
+
+def find_next_conversation(browser, current_elem=None, current_sig=None):
+    """
+    Tìm phần tử cuộc trò chuyện tiếp theo (ngay sau current_elem) trong danh sách bên trái.
+    Tự động xử lý Virtual Scrolling của TikTok: định vị chính xác vị trí của người vừa quét
+    trong DOM và lấy đúng người liền kề tiếp theo (curIdx + 1), khắc phục triệt để lỗi nhảy cóc
+    (như 10 -> 15 bỏ qua 11->14) do phần tử trên cùng bị unmount khi cuộn trang.
+    Trả về:
+      - WebElement: Phần tử tiếp theo cần quét.
+      - "AT_END": Đã duyệt đến phần tử cuối cùng hiện có trong DOM, cần cuộn để nạp thêm.
+      - None: Không tìm thấy (cần dùng fallback).
+    """
+    script = """
+    const currentElem = arguments[0];
+    const currentSig = (arguments[1] || '').trim().toLowerCase();
+
+    // 1. Tìm tất cả các phần tử cuộc trò chuyện trong DOM
+    const selectors = [
+        '[data-e2e="conversation-item"]',
+        '[data-e2e="chat-list-item"]',
+        '[class*="PInfoNickname"]',
+        'p[class*="Nickname"]',
+        'div[class*="Nickname"]'
+    ];
+
+    let items = [];
+    for (const sel of selectors) {
+        const found = Array.from(document.querySelectorAll(sel));
+        if (found.length > 0) {
+            items = found;
+            break;
+        }
+    }
+
+    if (items.length === 0) return null;
+
+    // 2. Nếu chưa có currentElem (bắt đầu quét): lấy phần tử đầu tiên
+    if (!currentElem && !currentSig) {
+        return items[0];
+    }
+
+    // 3. Ưu tiên tìm theo cờ data-streak-current được gán ở lượt trước
+    let curIdx = items.findIndex(el => el.getAttribute('data-streak-current') === 'true' || (el.querySelector && el.querySelector('[data-streak-current="true"]')));
+
+    // 4. Nếu không tìm thấy bằng cờ, so khớp bằng tham chiếu DOM node
+    if (curIdx === -1 && currentElem) {
+        curIdx = items.indexOf(currentElem);
+        if (curIdx === -1) {
+            curIdx = items.findIndex(el => el === currentElem || el.contains(currentElem) || currentElem.contains(el));
+        }
+    }
+
+    // 5. Nếu DOM node bị tái chế (recycled), so khớp bằng chữ ký text
+    if (curIdx === -1 && currentSig) {
+        const firstLine = currentSig.split('\\n')[0].trim();
+        curIdx = items.findIndex(el => {
+            const txt = (el.innerText || '').trim().toLowerCase();
+            return txt === currentSig || (firstLine && txt.startsWith(firstLine));
+        });
+    }
+
+    // 6. Trả về phần tử kế tiếp liền kề
+    if (curIdx !== -1) {
+        if (curIdx + 1 < items.length) {
+            // Xóa cờ data-streak-current ở phần tử cũ
+            try {
+                items[curIdx].removeAttribute('data-streak-current');
+                const sub = items[curIdx].querySelector('[data-streak-current="true"]');
+                if (sub) sub.removeAttribute('data-streak-current');
+            } catch(e) {}
+            return items[curIdx + 1];
+        } else {
+            return "AT_END";
+        }
+    }
+
+    return null;
+    """
+    try:
+        res = browser.execute_script(script, current_elem, current_sig)
+        return res
+    except Exception:
+        return None
+
+
 def scan_friends(browser, wait, log_cb=print, should_stop=None, account_id=None):
     """
     Quét danh sách bạn bè và nhóm chat từ hộp thư TikTok cho tài khoản cụ thể.
-    Tự động cuộn để lấy hết 100% cuộc trò chuyện (không bị giới hạn ở ~30 bạn).
+    Thuật toán: Quét tuần tự từ trên xuống dưới, từng người một (không đếm trước số lượng).
+    Sử dụng định vị liền kề để không bao giờ bị nhảy cóc (ví dụ 10 -> 15 bỏ qua 11->14).
+    Chỉ dừng lại nếu ID người trước == ID người hiện tại (đã đến cuộc trò chuyện cuối cùng của hộp thư).
     Trả về danh sách bạn bè & nhóm cập nhật.
     """
     log_cb("Đang truy cập hộp thư tin nhắn TikTok...")
@@ -1020,117 +1240,240 @@ def scan_friends(browser, wait, log_cb=print, should_stop=None, account_id=None)
         log_cb("[Cảnh báo] Không tìm thấy cuộc trò chuyện nào trong hộp thư.")
         return load_friends(account_id)
 
-    # TỰ ĐỘNG CUỘN ĐỂ TẢI HẾT TOÀN BỘ DANH SÁCH BẠN BÈ (VƯỢT GIỚI HẠN 30 MỤC)
-    all_user = auto_load_all_conversations(browser, log_cb=log_cb, should_stop=should_stop)
-    total_chats = len(all_user)
+    # Cuộn container danh sách cuộc trò chuyện lên trên cùng (scrollTop = 0)
+    try:
+        browser.execute_script("""
+            const selectors = ['[data-e2e="chat-list"]', '[data-e2e="conversation-list"]', '[class*="ChatList"]', 'aside [class*="list"]'];
+            for (const sel of selectors) {
+                const el = document.querySelector(sel);
+                if (el) { el.scrollTop = 0; break; }
+            }
+        """)
+        time.sleep(0.5)
+    except Exception:
+        pass
 
-    if total_chats == 0:
-        log_cb("[Cảnh báo] Không thể đọc danh sách cuộc trò chuyện.")
-        return load_friends(account_id)
-
-    log_cb(f"Tìm thấy tổng cộng {total_chats} cuộc trò chuyện. Bắt đầu thu thập thông tin...")
+    log_cb("Bắt đầu quét danh sách bạn bè từ trên xuống dưới (quét từng người một)...")
     current_friends = load_friends(account_id)
 
     # Bản đồ tra cứu bạn bè đã có
     user_map = {f["username"].lower(): f for f in current_friends if f.get("username")}
     nick_map = {f["nickname"].strip().lower(): f for f in current_friends if f.get("nickname")}
 
+    count_scanned = 0
     count_new = 0
     count_group = 0
 
-    for idx in range(1, total_chats + 1):
+    prev_id = None
+    current_elem = None
+    current_sig = None
+    scanned_identities = set()
+    consecutive_at_end = 0
+
+    while True:
         if should_stop and should_stop():
             log_cb("[Dừng] Người dùng yêu cầu dừng quá trình quét.")
             break
 
+        # 1. Tìm phần tử cuộc trò chuyện kế tiếp liền kề (ngay sau current_elem)
+        next_target = find_next_conversation(browser, current_elem, current_sig)
+
+        # 2. Xử lý trường hợp đã đến cuối DOM hiện tại ("AT_END") hoặc không tìm thấy bằng JS
+        if next_target == "AT_END" or next_target is None:
+            # Cuộn container xuống một bước vừa phải (350px) để TikTok nạp thêm item tiếp theo
+            scroll_chat_list_container(browser, step_pixels=350)
+            time.sleep(1.0)
+
+            # Đưa phần tử hiện tại vào giữa tầm nhìn nếu có
+            if current_elem:
+                try:
+                    browser.execute_script("arguments[0].scrollIntoView({block: 'center', inline: 'nearest'});", current_elem)
+                    time.sleep(0.4)
+                except Exception:
+                    pass
+
+            # Thử tìm lại phần tử kế tiếp sau khi cuộn
+            retry_target = find_next_conversation(browser, current_elem, current_sig)
+            if retry_target and retry_target != "AT_END":
+                next_target = retry_target
+                consecutive_at_end = 0
+            else:
+                # Fallback: nếu JS không tìm được, duyệt DOM tìm phần tử đầu tiên chưa quét
+                if next_target is None:
+                    elems = get_conversation_elements(browser)
+                    for el in elems:
+                        try:
+                            t = el.text.strip().lower()
+                            first_l = t.splitlines()[0] if t else ""
+                            if first_l and first_l not in scanned_identities:
+                                next_target = el
+                                break
+                        except Exception:
+                            continue
+
+                if next_target and next_target != "AT_END":
+                    consecutive_at_end = 0
+                else:
+                    consecutive_at_end += 1
+                    # Nếu đã cuộn 2 lần mà không có phần tử mới nào xuất hiện ở phía dưới
+                    if consecutive_at_end >= 2:
+                        log_cb(f"   -> [Dừng quét] ID người trước ('{prev_id}') trùng với người cuối cùng của hộp thư (không thể quét thêm)!")
+                        break
+                    else:
+                        time.sleep(1.0)
+                        continue
+        else:
+            consecutive_at_end = 0
+
+        user_elem = next_target
+
+        # Đưa phần tử vào giữa màn hình trước khi thao tác
         try:
-            # Lấy lại phần tử mới nhất trong DOM để tránh StaleElementReferenceException
-            fresh_elems = get_conversation_elements(browser)
-            if idx - 1 >= len(fresh_elems):
-                break
-            user_elem = fresh_elems[idx - 1]
+            browser.execute_script("arguments[0].scrollIntoView({block: 'center', inline: 'nearest'});", user_elem)
+            time.sleep(0.2)
+        except Exception:
+            pass
 
-            # Đưa phần tử vào giữa màn hình trước khi thao tác
-            try:
-                browser.execute_script("arguments[0].scrollIntoView({block: 'center', inline: 'nearest'});", user_elem)
-                time.sleep(0.2)
-            except Exception:
-                pass
+        raw_text = ""
+        try:
+            raw_text = user_elem.text.strip()
+        except Exception:
+            time.sleep(0.3)
+            continue
 
-            raw_nickname = user_elem.text.strip() or f"Bạn bè {idx}"
+        lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+        raw_nickname = lines[0] if lines else f"Mục {count_scanned + 1}"
 
-            # Bỏ qua các mục hệ thống như 'Yêu cầu tin nhắn' (Message Requests)
-            if raw_nickname.lower() in ["yêu cầu tin nhắn", "message requests", "tin nhắn yêu cầu"]:
-                log_cb(f"[{idx}/{total_chats}] Bỏ qua mục hệ thống: '{raw_nickname}'")
-                continue
+        # Đánh dấu cờ data-streak-current lên phần tử này để vòng lặp sau định vị chính xác
+        try:
+            browser.execute_script("arguments[0].setAttribute('data-streak-current', 'true');", user_elem)
+        except Exception:
+            pass
 
-            # Click an toàn
+        # Cập nhật phần tử hiện tại và chữ ký text
+        current_elem = user_elem
+        current_sig = raw_text
+
+        # Bỏ qua các mục hệ thống như 'Yêu cầu tin nhắn' (Message Requests)
+        if any(sys_kw in raw_nickname.lower() for sys_kw in ["yêu cầu tin nhắn", "message requests", "tin nhắn yêu cầu"]):
+            log_cb(f"   -> [Bỏ qua mục hệ thống] {raw_nickname}")
+            continue
+
+        # Click an toàn CHỈ VÀO TEXT/NICKNAME để mở chat (TUYỆT ĐỐI TRÁNH AVATAR STORY)
+        clicked = click_conversation_chat_safe(browser, user_elem)
+        if not clicked:
             try:
                 user_elem.click()
             except Exception:
-                browser.execute_script("arguments[0].click();", user_elem)
+                try:
+                    browser.execute_script("arguments[0].click();", user_elem)
+                except Exception:
+                    pass
 
+        time.sleep(0.8)
+
+        # Đóng Story nếu vô tình bị mở
+        close_story_if_open(browser, log_cb=log_cb)
+
+        # Trích xuất thông tin cuộc trò chuyện ở khung bên phải
+        chat_info = extract_chat_details(browser, fallback_nickname=raw_nickname)
+        is_group = chat_info.get("is_group", False)
+        chat_title = chat_info.get("title") or raw_nickname
+        username = chat_info.get("username", "")
+
+        # Định danh ID duy nhất của người / cuộc trò chuyện hiện tại
+        if is_group:
+            current_id = f"[nhóm] {chat_title}".strip().lower()
+        else:
+            current_id = (username or chat_title or raw_nickname).strip().lower()
+
+        # =========================================================================
+        # ĐIỀU KIỆN DỪNG: CHỈ DỪNG LẠI NẾU ID NGƯỜI TRƯỚC == ID NGƯỜI HIỆN TẠI
+        # =========================================================================
+        if prev_id is not None and current_id == prev_id:
+            # Chờ thêm 1.0s và kiểm tra lại một lần nữa để tránh dừng nhầm nếu mạng lag
             time.sleep(1.0)
-
-            chat_info = extract_chat_details(browser, fallback_nickname=raw_nickname)
-            is_group = chat_info.get("is_group", False)
-            chat_title = chat_info.get("title") or raw_nickname
-            username = chat_info.get("username", "")
-
-            if not username:
-                log_cb(f"[{idx}/{total_chats}] Không trích xuất được thông tin của: {chat_title}")
-                continue
-
-            # XỬ LÝ NHÓM CHAT
-            if is_group:
-                title_lower = chat_title.lower()
-                matched_group = nick_map.get(title_lower)
-
-                if matched_group:
-                    matched_group["nickname"] = chat_title
-                    if not matched_group.get("username", "").startswith("[Nhóm]"):
-                        matched_group["username"] = f"[Nhóm] {chat_title}"
-                    log_cb(f"[{idx}/{total_chats}] [Nhóm đã có] {chat_title}")
-                else:
-                    new_item = {
-                        "username": f"[Nhóm] {chat_title}",
-                        "nickname": chat_title,
-                        "enabled": True,
-                        "status": "Chưa gửi"
-                    }
-                    current_friends.append(new_item)
-                    nick_map[title_lower] = new_item
-                    count_new += 1
-                    count_group += 1
-                    log_cb(f"[{idx}/{total_chats}] [Nhóm mới] Đã thêm nhóm: {chat_title}")
-
-            # XỬ LÝ NGƯỜI DÙNG CÁ NHÂN (1-1)
+            recheck_info = extract_chat_details(browser, fallback_nickname=raw_nickname)
+            recheck_is_group = recheck_info.get("is_group", False)
+            recheck_title = recheck_info.get("title") or raw_nickname
+            recheck_user = recheck_info.get("username", "")
+            if recheck_is_group:
+                recheck_id = f"[nhóm] {recheck_title}".strip().lower()
             else:
-                u_lower = username.lower()
-                if u_lower in user_map:
-                    user_map[u_lower]["nickname"] = chat_title
-                    log_cb(f"[{idx}/{total_chats}] Đã có: {chat_title} (@{username})")
-                else:
-                    new_friend = {
-                        "username": username,
-                        "nickname": chat_title,
-                        "enabled": True,
-                        "status": "Chưa gửi"
-                    }
-                    current_friends.append(new_friend)
+                recheck_id = (recheck_user or recheck_title or raw_nickname).strip().lower()
+
+            if recheck_id == prev_id:
+                log_cb(f"   -> [Dừng quét] ID người trước ('{prev_id}') == ID người hiện tại ('{current_id}'). Đã đến cuộc trò chuyện cuối cùng của hộp thư!")
+                break
+            else:
+                current_id = recheck_id
+                chat_info = recheck_info
+                is_group = recheck_is_group
+                chat_title = recheck_title
+                username = recheck_user
+
+        # Cập nhật ID người trước
+        prev_id = current_id
+        count_scanned += 1
+        scanned_identities.add(current_id)
+        if username:
+            scanned_identities.add(username.lower())
+        scanned_identities.add(chat_title.strip().lower())
+        scanned_identities.add(raw_nickname.strip().lower())
+
+        # XỬ LÝ NHÓM CHAT
+        if is_group:
+            title_lower = chat_title.lower()
+            matched_group = nick_map.get(title_lower)
+
+            if matched_group:
+                matched_group["nickname"] = chat_title
+                if not matched_group.get("username", "").startswith("[Nhóm]"):
+                    matched_group["username"] = f"[Nhóm] {chat_title}"
+                log_cb(f"[{count_scanned}] [Nhóm đã có] {chat_title}")
+            else:
+                new_item = {
+                    "username": f"[Nhóm] {chat_title}",
+                    "nickname": chat_title,
+                    "enabled": True,
+                    "status": "Chưa gửi"
+                }
+                current_friends.append(new_item)
+                nick_map[title_lower] = new_item
+                count_new += 1
+                count_group += 1
+                log_cb(f"[{count_scanned}] [Nhóm mới] Đã thêm nhóm: {chat_title}")
+
+        # XỬ LÝ NGƯỜI DÙNG CÁ NHÂN (1-1)
+        else:
+            u_lower = username.lower() if username else ""
+            if u_lower and u_lower in user_map:
+                user_map[u_lower]["nickname"] = chat_title
+                log_cb(f"[{count_scanned}] Đã có: {chat_title} (@{username})")
+            elif not u_lower and chat_title.lower() in nick_map:
+                nick_map[chat_title.lower()]["nickname"] = chat_title
+                log_cb(f"[{count_scanned}] Đã có: {chat_title}")
+            else:
+                new_friend = {
+                    "username": username or chat_title,
+                    "nickname": chat_title,
+                    "enabled": True,
+                    "status": "Chưa gửi"
+                }
+                current_friends.append(new_friend)
+                if u_lower:
                     user_map[u_lower] = new_friend
-                    count_new += 1
-                    log_cb(f"[{idx}/{total_chats}] [Bạn mới] Đã thêm: {chat_title} (@{username})")
+                nick_map[chat_title.lower()] = new_friend
+                count_new += 1
+                user_display = f" (@{username})" if username else ""
+                log_cb(f"[{count_scanned}] [Bạn mới] Đã thêm: {chat_title}{user_display}")
 
-            # Lưu tạm định kỳ mỗi 5 bạn bè để tránh mất dữ liệu nếu bị ngắt đột ngột
-            if idx % 5 == 0:
-                save_friends(current_friends, account_id)
-
-        except Exception as e:
-            log_cb(f"[{idx}/{total_chats}] Bỏ qua do lỗi: {e}")
+        # Lưu tạm định kỳ mỗi 5 bạn bè
+        if count_scanned % 5 == 0:
+            save_friends(current_friends, account_id)
 
     save_friends(current_friends, account_id)
-    log_cb(f"[Hoàn tất] Đã cập nhật danh sách! ({count_new} mục mới, trong đó có {count_group} nhóm).")
+    log_cb(f"[Hoàn tất] Đã quét xong toàn bộ danh sách! Tổng cộng: {count_scanned} cuộc trò chuyện ({count_new} mục mới, trong đó có {count_group} nhóm).")
     return current_friends
 
 

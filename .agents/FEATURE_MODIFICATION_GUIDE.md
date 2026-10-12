@@ -156,10 +156,13 @@
    * **Chat 1-1:** Trích xuất `@username` cá nhân từ thẻ `<a>` hoặc text trong Chat Header.
    * **Nhóm chat (Group Chat):** Nhóm không có `@handle` cá nhân mà có tiêu đề nhóm và số lượng thành viên (`thành viên`, `members`,...). Được định danh là `[Nhóm] <Tên nhóm>`, cờ `is_group=True`.
    * **Đối chiếu thông minh (`find_matching_target`, Dòng ~790):** Chat 1-1 đối chiếu theo `@username`, Nhóm chat đối chiếu theo Tên nhóm (`nickname`). Đảm bảo không bao giờ bỏ qua nhóm dù dữ liệu cũ hay mới.
-3. **Bộ chọn danh sách & Tự động cuộn (`auto_load_all_conversations`, `scan_friends` & `send_messages_to_selected`)**:
-   * Danh sách class hiện tại: `[data-e2e='conversation-item']`, `[data-e2e='chat-list-item']`, `PInfoNickname`, `Nickname`.
-   * **Cơ chế Auto-scroll:** Tự động cuộn container tin nhắn bên trái để vượt qua giới hạn ~30 item mặc định của TikTok, tải 100% bạn bè và nhóm chat.
-   * **Chống Stale Element:** Luôn lấy lại DOM element tươi mới theo index và gọi `scrollIntoView({block: 'center'})` trước khi click.
+3. **Bộ chọn danh sách & Thuật toán quét tuần tự (`scan_friends`, `find_next_conversation`, `click_conversation_chat_safe`, `close_story_if_open`)**:
+   * Danh sách selector: `[data-e2e='conversation-item']`, `[data-e2e='chat-list-item']`, `PInfoNickname`, `Nickname`.
+   * **Thuật toán quét từ trên xuống dưới (Từng người một - Chống nhảy cóc):**
+     - Bắt đầu từ đầu danh sách (`scrollTop = 0`), duyệt từng người một, đếm lũy tiến `[1]`, `[2]`,... mà **không đếm số lượng tổng trước**.
+     - **Cơ chế định vị liền kề (`find_next_conversation`):** Sau mỗi lượt quét, gắn cờ `data-streak-current` lên phần tử hiện tại. Lượt kế tiếp tìm đúng vị trí của phần tử này trong DOM và lấy phần tử kế tiếp liền kề (`curIdx + 1`). Nhờ đó, ngay cả khi TikTok unmount phần tử trên cùng do Virtual Scrolling, vị trí quét vẫn luôn liên tục và **không bao giờ bị nhảy cóc (ví dụ 10 -> 15 bỏ qua 11->14)**.
+     - Đưa từng phần tử vào giữa màn hình (`scrollIntoView({block: 'center'})`), click an toàn chỉ vào Text/Nickname (loại trừ Avatar/Story), tự động đóng Story nếu lỡ bị mở.
+     - **Điều kiện dừng duy nhất:** Chỉ dừng lại khi **ID người trước == ID người hiện tại** (`prev_id is not None and current_id == prev_id`), biểu thị đã đến cuộc trò chuyện cuối cùng của hộp thư.
    * Tự động bỏ qua các mục hệ thống như `"Yêu cầu tin nhắn"` / `"Message requests"`.
 4. **Ô nhập tin nhắn chat (`send_messages_to_selected`, Dòng ~980)**:
    * TikTok dùng Draft.js (`contenteditable="true"`, `public-DraftStyleDefault-block`).
