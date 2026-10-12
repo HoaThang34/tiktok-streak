@@ -25,6 +25,8 @@ __pycache__/
 cookies.json
 accounts/
 accounts.json
+friends.json
+friends.csv
 
 # --- Trình biên dịch & Web runtime (nếu có) ---
 node_modules/

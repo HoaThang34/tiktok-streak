@@ -584,12 +584,13 @@ def save_friends(friends: list, account_id: str = None):
     except Exception:
         pass
 
-    # Đồng bộ sang file root nếu là tài khoản đang thao tác
-    try:
-        with open(LEGACY_FRIENDS_FILE, "w", encoding="utf-8") as f:
-            json.dump(friends, f, indent=4, ensure_ascii=False)
-    except Exception:
-        pass
+    # Chỉ lưu ra file root nếu không có account_id (chế độ legacy đơn tài khoản)
+    if not account_id:
+        try:
+            with open(LEGACY_FRIENDS_FILE, "w", encoding="utf-8") as f:
+                json.dump(friends, f, indent=4, ensure_ascii=False)
+        except Exception:
+            pass
 
 
 # ----------------------------
