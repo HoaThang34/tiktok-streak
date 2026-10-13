@@ -1,5 +1,7 @@
 # TikTok Streak Manager (Multi-Account Web Automation Dashboard)
 
+> 🇻🇳 **Tiếng Việt** • 🇬🇧 [English](#-tiktok-streak-manager-english)
+
 Ứng dụng web cục bộ chạy trên máy tính cá nhân giúp tự động hóa quá trình gửi tin nhắn duy trì chuỗi **Streak** trên TikTok an toàn, tiện lợi, hỗ trợ **quản lý và chạy nhiều tài khoản (nhiều cookies)**.
 
 Giao diện được thiết kế theo phong cách **Shadcn UI Light Mode**: tối giản, thanh lịch, sử dụng 100% biểu tượng SVG, phản hồi tức thì và không có chuyển động rườm rà.
@@ -123,3 +125,151 @@ http://localhost:5000
 ## Bảo Mật Thông Tin
 * Toàn bộ dữ liệu cookie của mọi tài khoản được lưu trữ an toàn trong thư mục `accounts/` và file `cookies.json`.
 * Thư mục này đã được tự động loại trừ trong file `.gitignore` để tránh rủi ro rò rỉ dữ liệu khi đẩy lên Git.
+
+---
+
+## Giấy Phép (License)
+
+Dự án này được phát hành theo giấy phép **MIT License** — xem chi tiết tại file [`LICENSE`](./LICENSE).
+
+Bạn hoàn toàn có thể sử dụng, sao chép, chỉnh sửa, phân phối dự án (kể cả mục đích thương mại) miễn là giữ nguyên thông báo bản quyền và giấy phép.
+
+---
+---
+---
+
+<a id="-tiktok-streak-manager-english"></a>
+
+# 🇬🇧 TikTok Streak Manager (English)
+
+A local web application that runs on your personal computer to safely and conveniently automate sending **Streak** messages on TikTok, with support for **managing and running multiple accounts (multiple cookies)**.
+
+The interface follows the **Shadcn UI Light Mode** style: minimal, elegant, 100% SVG icons, instant feedback, and no unnecessary animations.
+
+---
+
+## Highlights
+
+* **Multi-Account & Multi-Cookie Support**:
+  * Add, rename, delete, and manage unlimited TikTok accounts.
+  * Each account has its own session (cookies), message config, delay interval, and friend list.
+* **Safe Sequential Execution Per Account**:
+  * Optionally tick the accounts you want to run in each batch.
+  * Sequential mechanism: **Launch account -> load cookies -> send streak messages -> fully close the Chrome window -> short pause -> move to the next account**.
+  * Frees up memory and completely avoids login-session conflicts between accounts.
+* **Detailed Per-Account Status**:
+  * Records and clearly displays the **last login time** (`last_login`).
+  * Session status (`Ready (N cookies)` / `No cookies yet`).
+  * Status and last-run time (`Done (X/Y friends)`, `Running...`, `Error...`).
+* **Flexible Login via Cookies / QR Code**:
+  * Log in by scanning a QR code directly from the mobile TikTok app for each separate account. No password entry, no blocks or captchas.
+* **Per-Account Dynamic Time Message Templates**:
+  * Supported variables: `{time}`, `{date}`, `{datetime}`, `{hour}`, `{minute}`, `{second}`, `{nickname}`, `{username}`.
+  * Live Preview panel with a real-time clock.
+* **High Safety Mechanism**:
+  * Customize the pause (seconds) between send rounds to avoid spam.
+  * Per-account choice of headless mode or visible browser.
+  * Emergency stop button at any time (automatically closes the browser immediately).
+
+---
+
+## Project Structure
+
+```text
+tiktok-streak/
+├── app.py             # Local HTTP server serving the Web Dashboard & multi-account API
+├── utils.py           # Core Selenium module & multi-account, cookies, friends manager
+├── web/
+│   └── index.html     # Web Dashboard UI (Shadcn Light Mode, SVG icons)
+├── accounts.json      # Account list, last login times, statuses
+├── accounts/          # Independent data folder per account (secured in .gitignore)
+│   ├── acc_1/
+│   │   ├── cookies.json       # Account 1's own session
+│   │   ├── config.json        # Account 1's message config
+│   │   ├── friends.json       # Account 1's friend list
+│   │   └── friends.csv        # Friend list as a CSV spreadsheet
+│   └── acc_2/...
+├── requirements.txt   # Required Python libraries
+├── run.bat            # Quick-launch shortcut on Windows
+├── .env               # Environment variables
+├── .gitignore         # Excludes sensitive and junk files
+└── README.md          # Documentation
+```
+
+---
+
+## System Requirements
+
+1. **Operating System**: Windows 10/11 (or macOS / Linux).
+2. **Python**: Version 3.8 or newer.
+3. **Browser**: Google Chrome installed on your machine.
+
+---
+
+## Installation & Launch
+
+### 1. Install dependencies
+Open a terminal in the project folder and run:
+```powershell
+pip install -r requirements.txt
+```
+
+### 2. Launch the app
+* **Option 1 (Fastest on Windows):** Double-click the `run.bat` file.
+* **Option 2 (Via command line):**
+  ```powershell
+  python app.py
+  ```
+
+The system will start a local server and automatically open the admin dashboard in Google Chrome at:
+```
+http://localhost:5000
+```
+
+---
+
+## Multi-Account Usage Guide
+
+### Step 1: Manage & log in / load cookies for accounts
+1. In the **"Manage TikTok Account List"** section:
+   * Click the **"+ Add new account"** button:
+     * You can create an empty account (log in later), OR paste cookies right away, OR select an existing cookie `.json` file on your machine.
+   * To load/update cookies for any account, click the **"Cookie / Login"** button on that account row. There are 3 flexible options:
+     * **Option 1 - Scan QR code**: Open Chrome, scan the QR code from the mobile TikTok app; cookies are saved automatically after scanning.
+     * **Option 2 - Paste cookies**: Paste a JSON cookie array (exported from Cookie-Editor / EditThisCookie) or a Header string `sessionid=...; sid_tt=...;` and click Save.
+     * **Option 3 - Load a .json file**: Choose a `cookies.json` file on your computer to load into the account instantly.
+   * After successfully loading cookies, the account switches to **"Ready"** status and records the **last login time**.
+
+### Step 2: Set up message template & friend list per account
+1. Click the **"Manage"** button on the account you want to configure.
+2. In the **"Personal Settings"** area:
+   * Customize the streak message template (using tags like `{time}`, `{nickname}`, etc.).
+   * Set the safe pause interval and headless mode.
+   * Click **"Save this account's settings"**.
+3. In the **"Inbox Friend List"** area:
+   * Click **"Scan friends from TikTok"** to load this account's inbox contacts.
+   * Tick the friends you want to send streaks to; untick those you don't.
+
+### Step 3: Run multiple accounts sequentially
+1. In the account table, tick the **"Run"** checkbox of the accounts you want in this batch (or click **"Select all to run"**).
+2. Click the big button: **"▶ Start running selected accounts sequentially"**.
+3. The automatic process proceeds:
+   * **Account 1**: Open Chrome -> Load cookies -> Send streak messages to selected friends -> Update status & send time -> **Fully close the Chrome window**.
+   * Short 3-second pause.
+   * **Account 2**: Open Chrome -> Load cookies -> Send streak messages -> **Fully close the Chrome window** -> ...
+4. Monitor every detail in the **Live Logs** panel.
+5. You can click **"Emergency stop"** at any time to immediately halt the process and close the browser.
+
+---
+
+## Security
+* All cookie data for every account is stored safely in the `accounts/` folder and `cookies.json` file.
+* This folder is automatically excluded in `.gitignore` to avoid data-leak risks when pushing to Git.
+
+---
+
+## License
+
+This project is released under the **MIT License** — see the [`LICENSE`](./LICENSE) file for details.
+
+You are free to use, copy, modify, and distribute the project (including for commercial purposes) as long as the copyright notice and license are preserved.
