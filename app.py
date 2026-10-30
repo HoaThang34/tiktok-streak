@@ -39,7 +39,8 @@ from utils import (
     save_cookies,
     extract_logged_in_username,
     scan_friends,
-    send_messages_to_selected
+    send_messages_to_selected,
+    is_friend_replied_today
 )
 
 # ----------------- BIẾN TOÀN CỤC & NHẬT KÝ -----------------
@@ -197,10 +198,22 @@ def task_login_and_save_cookies(account_id):
             add_log(f"[{acc_name}] Đã đóng trình duyệt.")
 
 
+def account_send_progress(acc_id):
+    """Trả về (sent_today, selected_total) cho một tài khoản."""
+    friends = load_friends(acc_id)
+    selected = [f for f in friends if f.get("enabled", True)]
+    today = time.strftime("%d/%m/%Y")
+    sent = sum(1 for f in selected if is_friend_replied_today(f, today))
+    return sent, len(selected)
+
+
 def task_send_messages_sequential(account_ids=None):
     """
-    Thực hiện chạy tuần tự từng tài khoản được chọn:
-    Chạy xong tài khoản này -> tắt cửa sổ trình duyệt -> chuyển sang tài khoản khác.
+    Thực hiện chạy tuần tự từng tài khoản được chọn.
+    Trước mỗi vòng chạy, kiểm tra tiến độ của các tài khoản đã chạy:
+    - Nếu sent < selected -> chạy lại tài khoản đó.
+    - Nếu mọi tài khoản đều sent == selected -> hoàn thành.
+    Chỉ lặp lại khi còn tài khoản chưa đủ bạn và còn tiến bộ; dừng khi không còn tiến bộ.
     """
     if not account_ids:
         accounts = load_accounts()
@@ -210,113 +223,174 @@ def task_send_messages_sequential(account_ids=None):
         add_log("[Cảnh báo] Không có tài khoản nào được chọn để chạy!")
         return
 
+    account_ids = [a for a in account_ids if a]
     total = len(account_ids)
+
     add_log("=" * 62)
     add_log(f"[*] BẮT ĐẦU CHẠY TUẦN TỰ CHO {total} TÀI KHOẢN ĐÃ CHỌN")
-    add_log("[*] Thao tác: Mở browser -> Gửi streak -> Tắt browser -> Chuyển tài khoản tiếp theo")
+    add_log("[*] Kiểm tra tiến độ hiện tại, chỉ chạy lại tài khoản chưa gửi đủ bạn bè")
     add_log("=" * 62)
 
-    success_accounts = 0
-    for idx, acc_id in enumerate(account_ids, start=1):
+    round_no = 0
+    while True:
+        round_no += 1
         if STOP_EVENT.is_set():
             add_log("[Dừng] Người dùng đã yêu cầu dừng chuỗi tác vụ.")
             break
 
-        acc = get_account(acc_id)
-        if not acc:
-            continue
-        acc_name = acc.get("name", f"Tài khoản {idx}")
+        # Xác định tài khoản chưa gửi đủ bạn bè
+        pending_ids = []
+        any_selected = False
+        for acc_id in account_ids:
+            acc = get_account(acc_id)
+            if not acc:
+                continue
+            sent, selected = account_send_progress(acc_id)
+            if selected <= 0:
+                continue
+            any_selected = True
+            if sent < selected:
+                pending_ids.append(acc_id)
 
-        add_log(f"\n------------------------------------------------------------")
-        add_log(f">>> [{idx}/{total}] ĐANG XỬ LÝ: {acc_name} <<<")
-        add_log(f"------------------------------------------------------------")
+        # Nếu không còn tài khoản chưa đủ -> hoàn thành
+        if not pending_ids:
+            for acc_id in account_ids:
+                sent, selected = account_send_progress(acc_id)
+                if selected > 0:
+                    update_account(acc_id, status=f"Hoàn thành ({sent}/{selected} bạn)")
+            add_log("\n" + "=" * 62)
+            add_log("[KẾT THÚC] Tất cả tài khoản đã gửi đủ số bạn bè đã chọn. Hoàn thành!")
+            add_log("=" * 62)
+            return
 
-        cookie_file = get_account_cookie_path(acc_id)
-        if not (os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 50):
-            add_log(f"[{acc_name}] [Bỏ qua] Chưa có cookies! Vui lòng đăng nhập tài khoản này trước.")
-            update_account(acc_id, status="Lỗi: Chưa có cookies")
-            continue
+        if not any_selected:
+            add_log("[Cảnh báo] Không có bạn bè nào được chọn để gửi ở các tài khoản này.")
+            return
 
-        cfg = load_config(acc_id)
-        msg = cfg.get("message", "Chào {nickname}, rep chuỗi streak nè {time}!")
-        delay = cfg.get("delay_seconds", 3)
-        headless = cfg.get("headless", True)
+        run_total = len(pending_ids)
+        add_log(f"\n>>> VÒNG {round_no}: {run_total} tài khoản chưa gửi đủ <<<")
 
-        friends = load_friends(acc_id)
-        selected_friends = [f for f in friends if f.get("enabled", True)]
-        if not selected_friends:
-            add_log(f"[{acc_name}] [Bỏ qua] Không có bạn bè nào được chọn để gửi streak!")
-            update_account(acc_id, status="Bỏ qua (0 bạn chọn)")
-            continue
+        success_accounts = 0
+        for idx, acc_id in enumerate(pending_ids, start=1):
+            if STOP_EVENT.is_set():
+                add_log("[Dừng] Người dùng đã yêu cầu dừng chuỗi tác vụ.")
+                break
 
-        update_account(acc_id, status="Đang chạy...")
-        browser = None
-        try:
-            add_log(f"[{acc_name}] Mở trình duyệt Chrome (Chạy ẩn: {headless})...")
-            browser, wait = init_browser(headless=headless)
+            acc = get_account(acc_id)
+            if not acc:
+                continue
+            acc_name = acc.get("name", f"Tài khoản {idx}")
 
-            add_log(f"[{acc_name}] Nạp cookies và xác thực phiên...")
-            login_with_cookies(browser, wait, cookie_file=cookie_file, log_cb=add_log)
+            add_log(f"\n------------------------------------------------------------")
+            add_log(f">>> [{idx}/{run_total}] ĐANG XỬ LÝ: {acc_name} <<<")
+            add_log(f"------------------------------------------------------------")
 
-            # Cập nhật thời gian đăng nhập lần cuối
-            now_str = time.strftime("%H:%M:%S %d/%m/%Y")
-            update_account(acc_id, last_login=now_str)
+            cookie_file = get_account_cookie_path(acc_id)
+            if not (os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 50):
+                add_log(f"[{acc_name}] [Bỏ qua] Chưa có cookies! Vui lòng đăng nhập tài khoản này trước.")
+                update_account(acc_id, status="Lỗi: Chưa có cookies")
+                continue
 
-            # Nhận diện username nếu chưa có
-            if not acc.get("username"):
-                u = extract_logged_in_username(browser)
-                if u:
-                    update_account(acc_id, username=u)
-                    add_log(f"[{acc_name}] Nhận diện TikTok: @{u}")
+            cfg = load_config(acc_id)
+            msg = cfg.get("message", "Chào {nickname}, rep chuỗi streak nè {time}!")
+            delay = cfg.get("delay_seconds", 3)
+            headless = cfg.get("headless", True)
 
-            # Gửi tin nhắn streak
-            sent_count, target_count = send_messages_to_selected(
-                browser, wait,
-                message=msg,
-                delay_sec=delay,
-                log_cb=add_log,
-                should_stop=lambda: STOP_EVENT.is_set(),
-                account_id=acc_id
-            )
+            friends = load_friends(acc_id)
+            selected_friends = [f for f in friends if f.get("enabled", True)]
+            if not selected_friends:
+                add_log(f"[{acc_name}] [Bỏ qua] Không có bạn bè nào được chọn để gửi streak!")
+                update_account(acc_id, status="Bỏ qua (0 bạn chọn)")
+                continue
+
+            sent_before, selected_before = account_send_progress(acc_id)
+            add_log(f"[{acc_name}] Tiến độ hiện tại: {sent_before}/{selected_before} bạn đã gửi.")
+
+            update_account(acc_id, status="Đang chạy...")
+            browser = None
+            try:
+                add_log(f"[{acc_name}] Mở trình duyệt Chrome (Chạy ẩn: {headless})...")
+                browser, wait = init_browser(headless=headless)
+
+                add_log(f"[{acc_name}] Nạp cookies và xác thực phiên...")
+                login_with_cookies(browser, wait, cookie_file=cookie_file, log_cb=add_log)
+
+                now_str = time.strftime("%H:%M:%S %d/%m/%Y")
+                update_account(acc_id, last_login=now_str)
+
+                if not acc.get("username"):
+                    u = extract_logged_in_username(browser)
+                    if u:
+                        update_account(acc_id, username=u)
+                        add_log(f"[{acc_name}] Nhận diện TikTok: @{u}")
+
+                sent_count, target_count = send_messages_to_selected(
+                    browser, wait,
+                    message=msg,
+                    delay_sec=delay,
+                    log_cb=add_log,
+                    should_stop=lambda: STOP_EVENT.is_set(),
+                    account_id=acc_id
+                )
+
+                if STOP_EVENT.is_set():
+                    update_account(acc_id, status=f"Đã dừng ({sent_count}/{target_count} bạn)")
+                    add_log(f"[{acc_name}] Đã dừng tiến trình theo yêu cầu.")
+                else:
+                    finish_time = time.strftime("%H:%M:%S %d/%m/%Y")
+                    if sent_count >= target_count:
+                        update_account(acc_id, status=f"Hoàn thành ({sent_count}/{target_count} bạn)", last_run=finish_time)
+                        add_log(f"[{acc_name}] [Hoàn thành] Đã gửi tin nhắn cho {sent_count}/{target_count} bạn bè!")
+                        success_accounts += 1
+                    else:
+                        update_account(acc_id, status=f"Chưa hoàn thành ({sent_count}/{target_count} bạn)", last_run=finish_time)
+                        add_log(f"[{acc_name}] [Chưa hoàn thành] Đã gửi {sent_count}/{target_count} bạn bè, cần chạy lại.")
+
+            except Exception as e:
+                add_log(f"[{acc_name}] [Lỗi]: {e}")
+                update_account(acc_id, status=f"Lỗi: {e}")
+            finally:
+                if browser:
+                    add_log(f"[{acc_name}] Đang tắt cửa sổ trình duyệt...")
+                    try:
+                        browser.quit()
+                    except Exception:
+                        pass
+                    add_log(f"[{acc_name}] Đã tắt cửa sổ trình duyệt thành công.")
 
             if STOP_EVENT.is_set():
-                update_account(acc_id, status=f"Đã dừng ({sent_count}/{target_count} bạn)")
-                add_log(f"[{acc_name}] Đã dừng tiến trình theo yêu cầu.")
-            else:
-                finish_time = time.strftime("%H:%M:%S %d/%m/%Y")
-                update_account(acc_id, status=f"Hoàn thành ({sent_count}/{target_count} bạn)", last_run=finish_time)
-                add_log(f"[{acc_name}] [Hoàn thành] Đã gửi tin nhắn cho {sent_count}/{target_count} bạn bè!")
-                success_accounts += 1
+                break
 
-        except Exception as e:
-            add_log(f"[{acc_name}] [Lỗi]: {e}")
-            update_account(acc_id, status=f"Lỗi: {e}")
-        finally:
-            if browser:
-                add_log(f"[{acc_name}] Đang tắt cửa sổ trình duyệt...")
-                try:
-                    browser.quit()
-                except Exception:
-                    pass
-                add_log(f"[{acc_name}] Đã tắt cửa sổ trình duyệt thành công.")
+            if idx < run_total:
+                add_log(f"[*] Nghỉ 3 giây trước khi chuyển sang tài khoản kế tiếp...")
+                for _ in range(3):
+                    if STOP_EVENT.is_set():
+                        break
+                    time.sleep(1)
 
         if STOP_EVENT.is_set():
             break
 
-        if idx < total:
-            add_log(f"[*] Nghỉ 3 giây trước khi chuyển sang tài khoản kế tiếp...")
-            for _ in range(3):
-                if STOP_EVENT.is_set():
-                    break
-                time.sleep(1)
+    final_pending = []
+    any_final_selected = False
+    for acc_id in account_ids:
+        sent, selected = account_send_progress(acc_id)
+        if selected > 0:
+            any_final_selected = True
+            if sent < selected:
+                final_pending.append(acc_id)
 
     add_log("\n" + "=" * 62)
-    add_log(f"[KẾT THÚC] Đã hoàn thành quy trình chạy tuần tự: {success_accounts}/{total} tài khoản thành công.")
+    if any_final_selected and not final_pending:
+        add_log("[KẾT THÚC] Tất cả tài khoản đã gửi đủ số bạn bè đã chọn. Hoàn thành!")
+    elif final_pending:
+        add_log(f"[KẾT THÚC] Vẫn còn {len(final_pending)} tài khoản chưa gửi đủ; có thể chạy lại sau.")
+    else:
+        add_log("[KẾT THÚC] Quy trình chạy tuần tự kết thúc.")
     add_log("=" * 62)
 
 
 def reset_account_data(account_id=None):
-    """Xóa dữ liệu của một tài khoản hoặc toàn bộ."""
     if account_id:
         acc = get_account(account_id)
         name = acc.get("name", account_id) if acc else account_id
