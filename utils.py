@@ -12,6 +12,7 @@ import os
 import json
 import sys
 import shutil
+import unicodedata
 from dotenv import load_dotenv
 
 if sys.platform == "win32":
@@ -57,6 +58,45 @@ def get_account_friends_path(account_id: str) -> str:
 
 def get_account_friends_csv_path(account_id: str) -> str:
     return os.path.join(get_account_dir(account_id), "friends.csv")
+
+
+def slugify_name(name: str) -> str:
+    """Chuyển tên tài khoản thành slug an toàn cho URL (VD: 'HHA' -> 'hha')."""
+    if not name:
+        return ""
+    text = unicodedata.normalize("NFKD", str(name))
+    text = text.replace("đ", "d").replace("Đ", "D")
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    text = text.lower()
+    text = re.sub(r"[^a-z0-9]+", "-", text).strip("-")
+    return text
+
+
+def make_unique_slug(base_slug: str, accounts, exclude_id: str = None) -> str:
+    """Đảm bảo slug không trùng với tài khoản khác (thêm hậu tố -2, -3...)."""
+    base_slug = base_slug or "account"
+    used = {
+        (a.get("slug") or "").lower()
+        for a in accounts
+        if a.get("id") != exclude_id and a.get("slug")
+    }
+    slug = base_slug
+    counter = 2
+    while slug.lower() in used:
+        slug = f"{base_slug}-{counter}"
+        counter += 1
+    return slug
+
+
+def find_account_by_slug(slug: str):
+    """Tìm tài khoản theo slug (không phân biệt hoa thường)."""
+    if not slug:
+        return None
+    target = str(slug).strip().lower()
+    for acc in load_accounts():
+        if (acc.get("slug") or "").lower() == target:
+            return acc
+    return None
 
 
 def ensure_data_migration():
@@ -191,6 +231,28 @@ def load_accounts():
         if "enabled" not in acc:
             acc["enabled"] = True
 
+    # Gán slug duy nhất cho từng tài khoản (2 lượt: tạo slug gốc, sau đó chống trùng)
+    slug_changed = False
+    for acc in accounts:
+        base = acc.get("slug") or slugify_name(acc.get("name", "")) or acc.get("id", "account")
+        acc["_slug_base"] = base
+
+    used_slugs = set()
+    for acc in accounts:
+        base = acc.pop("_slug_base", "") or acc.get("id", "account")
+        slug = base
+        counter = 2
+        while slug.lower() in used_slugs:
+            slug = f"{base}-{counter}"
+            counter += 1
+        used_slugs.add(slug.lower())
+        if acc.get("slug") != slug:
+            acc["slug"] = slug
+            slug_changed = True
+
+    if slug_changed:
+        save_accounts(accounts)
+
     return accounts
 
 
@@ -199,8 +261,11 @@ def save_accounts(accounts):
     # Chỉ lưu các trường dữ liệu cần thiết
     clean_list = []
     for acc in accounts:
+        acc_id = acc.get("id")
+        slug = acc.get("slug") or slugify_name(acc.get("name", "")) or acc_id
         clean_list.append({
-            "id": acc.get("id"),
+            "id": acc_id,
+            "slug": slug,
             "name": acc.get("name", "Tài khoản"),
             "username": acc.get("username", ""),
             "last_login": acc.get("last_login", "Chưa đăng nhập"),
@@ -388,6 +453,7 @@ def create_account(name="Tài khoản mới", raw_cookies=None):
 
     new_acc = {
         "id": acc_id,
+        "slug": make_unique_slug(slugify_name(name) or acc_id, accounts),
         "name": name,
         "username": "",
         "last_login": last_login,
@@ -407,6 +473,10 @@ def update_account(account_id: str, **kwargs):
         if acc.get("id") == account_id:
             for k, v in kwargs.items():
                 acc[k] = v
+            # Đổi tên -> tự cập nhật slug (trừ khi slug được chỉ định rõ ràng)
+            if "name" in kwargs and "slug" not in kwargs:
+                base = slugify_name(kwargs.get("name", "")) or account_id
+                acc["slug"] = make_unique_slug(base, accounts, exclude_id=account_id)
             break
     save_accounts(accounts)
 

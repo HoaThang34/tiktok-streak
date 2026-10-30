@@ -1,11 +1,12 @@
 import os
+import re
 import sys
 import json
 import time
 import socket
 import threading
 import webbrowser
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, unquote
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -40,7 +41,8 @@ from utils import (
     extract_logged_in_username,
     scan_friends,
     send_messages_to_selected,
-    is_friend_replied_today
+    is_friend_replied_today,
+    find_account_by_slug
 )
 
 # ----------------- BIẾN TOÀN CỤC & NHẬT KÝ -----------------
@@ -433,11 +435,99 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def read_json_body(self):
+        if getattr(self, "_json_cache", None) is not None:
+            return self._json_cache
         content_length = int(self.headers.get("Content-Length", 0))
+        data = {}
         if content_length > 0:
             raw = self.rfile.read(content_length).decode("utf-8")
-            return json.loads(raw)
-        return {}
+            data = json.loads(raw)
+        self._json_cache = data
+        return data
+
+    def get_scope_account(self):
+        """
+        Trang riêng /account/<slug>/ gửi kèm scope_slug ở mọi request.
+        Trả về account tương ứng (hoặc None nếu đang ở dashboard gốc).
+        """
+        if getattr(self, "_scope_resolved", False):
+            return self._scope_account
+
+        parsed = urlparse(self.path)
+        slug = parse_qs(parsed.query).get("scope_slug", [None])[0]
+        if not slug:
+            try:
+                slug = self.read_json_body().get("scope_slug")
+            except Exception:
+                slug = None
+
+        self._scope_resolved = True
+        self._scope_slug = slug
+        self._scope_account = find_account_by_slug(slug) if slug else None
+        return self._scope_account
+
+    def deny_out_of_scope(self, target_account_id):
+        """Chặn thao tác lên tài khoản khác khi đang ở trang riêng."""
+        acc = self.get_scope_account()
+        if acc and target_account_id and target_account_id != acc.get("id"):
+            self.send_json({
+                "success": False,
+                "error": "Trang cài đặt riêng chỉ được thao tác trên tài khoản của nó."
+            }, 403)
+            return True
+        return False
+
+    def deny_body_scope_mismatch(self):
+        """
+        Chặn request gửi kèm account_id / account_ids trỏ tới tài khoản khác
+        khi đang ở trang cài đặt riêng (không âm thầm đổi mục tiêu).
+        """
+        acc = self.get_scope_account()
+        if not acc:
+            return False
+        try:
+            data = self.read_json_body()
+        except Exception:
+            return False
+        if not isinstance(data, dict):
+            return False
+        scope_id = acc.get("id")
+        requested = data.get("account_id")
+        if requested and requested != scope_id:
+            self.send_json({
+                "success": False,
+                "error": "Trang cài đặt riêng chỉ được thao tác trên tài khoản của nó."
+            }, 403)
+            return True
+        ids = data.get("account_ids")
+        if isinstance(ids, list) and any(i and i != scope_id for i in ids):
+            self.send_json({
+                "success": False,
+                "error": "Trang cài đặt riêng chỉ được chạy cho tài khoản của nó."
+            }, 403)
+            return True
+        return False
+
+    def deny_if_scoped(self, message="Thao tác này không khả dụng ở trang cài đặt riêng."):
+        """Chặn các thao tác ảnh hưởng nhiều tài khoản khi đang ở trang riêng."""
+        if self.get_scope_account():
+            self.send_json({"success": False, "error": message}, 403)
+            return True
+        return False
+
+    def serve_index(self):
+        html_path = os.path.join(os.path.dirname(__file__), "web", "index.html")
+        if os.path.exists(html_path):
+            with open(html_path, "rb") as f:
+                content = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(content)))
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.end_headers()
+            self.wfile.write(content)
+        else:
+            self.send_error(404, "Not Found")
 
     def do_GET(self):
         global ACTIVE_ACCOUNT_ID
@@ -446,23 +536,35 @@ class DashboardHandler(BaseHTTPRequestHandler):
         query = parse_qs(parsed.query)
 
         if path in ["/", "/index.html"]:
-            html_path = os.path.join(os.path.dirname(__file__), "web", "index.html")
-            if os.path.exists(html_path):
-                with open(html_path, "rb") as f:
-                    content = f.read()
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.send_header("Content-Length", str(len(content)))
-                self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.serve_index()
+            return
+
+        # Trang cài đặt riêng: /account/<slug>/ (và không có dấu / ở cuối)
+        m = re.match(r"^/account/([^/]+)/?$", path)
+        if m:
+            slug = unquote(m.group(1))
+            if not m.group(0).endswith("/"):
+                self.send_response(301)
+                self.send_header("Location", f"/account/{slug}/")
                 self.end_headers()
-                self.wfile.write(content)
-            else:
-                self.send_error(404, "Không tìm thấy file web/index.html")
+                return
+            if not find_account_by_slug(slug):
+                self.send_error(404, "Not Found")
+                return
+            self.serve_index()
+            return
+
+        scope_acc = self.get_scope_account()
+        if self._scope_slug and not scope_acc:
+            self.send_json({"error": "Tài khoản không tồn tại"}, 404)
             return
 
         # API: Status
         if path == "/api/status":
             accounts = load_accounts()
+            if scope_acc:
+                accounts = [a for a in accounts if a["id"] == scope_acc["id"]]
+                ACTIVE_ACCOUNT_ID = scope_acc["id"]
             # Đảm bảo ACTIVE_ACCOUNT_ID hợp lệ
             if not any(a["id"] == ACTIVE_ACCOUNT_ID for a in accounts):
                 if accounts:
@@ -472,24 +574,28 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 "is_running": CURRENT_TASK["is_running"],
                 "task_name": CURRENT_TASK["name"],
                 "active_account_id": ACTIVE_ACCOUNT_ID,
-                "accounts": accounts
+                "accounts": accounts,
+                "page_slug": self._scope_slug if scope_acc else None
             })
             return
 
         # API: Accounts list
         if path == "/api/accounts":
-            self.send_json(load_accounts())
+            accounts = load_accounts()
+            if scope_acc:
+                accounts = [a for a in accounts if a["id"] == scope_acc["id"]]
+            self.send_json(accounts)
             return
 
         # API: Config của tài khoản
         if path == "/api/config":
-            acc_id = query.get("account_id", [ACTIVE_ACCOUNT_ID])[0]
+            acc_id = scope_acc["id"] if scope_acc else query.get("account_id", [ACTIVE_ACCOUNT_ID])[0]
             self.send_json(load_config(acc_id))
             return
 
         # API: Friends list của tài khoản
         if path == "/api/friends":
-            acc_id = query.get("account_id", [ACTIVE_ACCOUNT_ID])[0]
+            acc_id = scope_acc["id"] if scope_acc else query.get("account_id", [ACTIVE_ACCOUNT_ID])[0]
             self.send_json(load_friends(acc_id))
             return
 
@@ -497,6 +603,17 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if path == "/api/logs":
             since = int(query.get("since", [0])[0])
             logs, next_idx = get_logs(since)
+            if scope_acc:
+                # Ở trang riêng: ẩn mọi dòng log nhắc tới tài khoản khác
+                own_name = scope_acc.get("name", "")
+                other_names = [
+                    a.get("name", "") for a in load_accounts()
+                    if a.get("id") != scope_acc["id"] and a.get("name") and a.get("name") != own_name
+                ]
+                logs = [
+                    ln for ln in logs
+                    if not any(f"[{n}]" in ln for n in other_names)
+                ]
             self.send_json({"logs": logs, "next_index": next_idx})
             return
 
@@ -509,6 +626,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         # API: Create Account
         if path == "/api/accounts/create":
+            if self.deny_if_scoped("Không thể tạo tài khoản mới từ trang cài đặt riêng. Hãy quay về trang quản lý tổng."):
+                return
             data = self.read_json_body()
             name = data.get("name", "").strip() or "Tài khoản mới"
             cookies_raw = data.get("cookies_raw")
@@ -527,7 +646,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
         # API: Import Cookies to Account (Paste text hoặc JSON file content)
         if path == "/api/accounts/import-cookies":
             data = self.read_json_body()
-            acc_id = data.get("account_id") or ACTIVE_ACCOUNT_ID
+            scope_acc = self.get_scope_account()
+            acc_id = scope_acc["id"] if scope_acc else (data.get("account_id") or ACTIVE_ACCOUNT_ID)
+            if self.deny_out_of_scope(acc_id):
+                return
             cookies_raw = data.get("cookies_raw", "")
             if not cookies_raw:
                 self.send_json({"success": False, "error": "Dữ liệu cookie trống"}, 400)
@@ -545,7 +667,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
         # API: Update Account (rename or toggle enabled)
         if path == "/api/accounts/update":
             data = self.read_json_body()
-            acc_id = data.get("id")
+            scope_acc = self.get_scope_account()
+            acc_id = scope_acc["id"] if scope_acc else data.get("id")
+            if self.deny_out_of_scope(acc_id):
+                return
             if not acc_id:
                 self.send_json({"success": False, "error": "Thiếu account id"}, 400)
                 return
@@ -556,11 +681,18 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 kwargs["enabled"] = bool(data["enabled"])
             if kwargs:
                 update_account(acc_id, **kwargs)
-            self.send_json({"success": True})
+            updated = get_account(acc_id)
+            self.send_json({
+                "success": True,
+                "slug": updated.get("slug") if updated else None,
+                "redirect": f"/account/{updated.get('slug')}/" if scope_acc and updated else None
+            })
             return
 
         # API: Delete Account
         if path == "/api/accounts/delete":
+            if self.deny_if_scoped("Không thể xóa tài khoản từ trang cài đặt riêng. Hãy quay về trang quản lý tổng."):
+                return
             data = self.read_json_body()
             acc_id = data.get("id")
             if CURRENT_TASK["is_running"]:
@@ -578,6 +710,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         # API: Toggle All Accounts (chọn tất cả / bỏ chọn tất cả để chạy)
         if path == "/api/accounts/toggle-all":
+            if self.deny_if_scoped("Chỉ quản lý được tài khoản này ở trang cài đặt riêng."):
+                return
             data = self.read_json_body()
             state = bool(data.get("state", True))
             accounts = load_accounts()
@@ -591,7 +725,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
         # API: Select Active Account
         if path == "/api/accounts/select-active":
             data = self.read_json_body()
-            acc_id = data.get("id")
+            scope_acc = self.get_scope_account()
+            acc_id = scope_acc["id"] if scope_acc else data.get("id")
+            if self.deny_out_of_scope(acc_id):
+                return
             if acc_id:
                 ACTIVE_ACCOUNT_ID = acc_id
             self.send_json({"success": True, "active_account_id": ACTIVE_ACCOUNT_ID})
@@ -600,9 +737,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
         # API: Save Config cho tài khoản
         if path == "/api/config":
             data = self.read_json_body()
+            scope_acc = self.get_scope_account()
+            if self.deny_body_scope_mismatch():
+                return
             apply_to_all = bool(data.get("apply_to_all", False))
 
             if apply_to_all:
+                if self.deny_if_scoped("Trang cài đặt riêng chỉ áp dụng được cho tài khoản này."):
+                    return
                 accounts = load_accounts()
                 for a in accounts:
                     a_id = a.get("id")
@@ -630,7 +772,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self.send_json({"success": True, "applied_all": True})
                 return
 
-            acc_id = data.get("account_id", ACTIVE_ACCOUNT_ID)
+            acc_id = scope_acc["id"] if scope_acc else data.get("account_id", ACTIVE_ACCOUNT_ID)
+            if self.deny_out_of_scope(acc_id):
+                return
             cfg = load_config(acc_id)
             if "message" in data:
                 cfg["message"] = data["message"]
@@ -648,7 +792,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
         # API: Toggle Friend Enabled cho tài khoản
         if path == "/api/friends/toggle":
             data = self.read_json_body()
-            acc_id = data.get("account_id", ACTIVE_ACCOUNT_ID)
+            scope_acc = self.get_scope_account()
+            acc_id = scope_acc["id"] if scope_acc else data.get("account_id", ACTIVE_ACCOUNT_ID)
+            if self.deny_out_of_scope(acc_id):
+                return
             username = data.get("username", "").lower()
             friends = load_friends(acc_id)
             for f in friends:
@@ -662,7 +809,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
         # API: Select All / Deselect All bạn bè cho tài khoản
         if path == "/api/friends/select-all":
             data = self.read_json_body()
-            acc_id = data.get("account_id", ACTIVE_ACCOUNT_ID)
+            scope_acc = self.get_scope_account()
+            acc_id = scope_acc["id"] if scope_acc else data.get("account_id", ACTIVE_ACCOUNT_ID)
+            if self.deny_out_of_scope(acc_id):
+                return
             state = bool(data.get("state", True))
             friends = load_friends(acc_id)
             for f in friends:
@@ -677,7 +827,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
         # API: Add Friend cho tài khoản
         if path == "/api/friends/add":
             data = self.read_json_body()
-            acc_id = data.get("account_id", ACTIVE_ACCOUNT_ID)
+            scope_acc = self.get_scope_account()
+            acc_id = scope_acc["id"] if scope_acc else data.get("account_id", ACTIVE_ACCOUNT_ID)
+            if self.deny_out_of_scope(acc_id):
+                return
             u = data.get("username", "").strip().replace("@", "")
             nick = data.get("nickname", "").strip() or u
             if not u:
@@ -703,7 +856,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
         # API: Delete Friend của tài khoản
         if path == "/api/friends/delete":
             data = self.read_json_body()
-            acc_id = data.get("account_id", ACTIVE_ACCOUNT_ID)
+            scope_acc = self.get_scope_account()
+            acc_id = scope_acc["id"] if scope_acc else data.get("account_id", ACTIVE_ACCOUNT_ID)
+            if self.deny_out_of_scope(acc_id):
+                return
             username = data.get("username", "").lower()
             friends = load_friends(acc_id)
             friends = [f for f in friends if f.get("username", "").lower() != username]
@@ -715,7 +871,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
         # API: Start Scan bạn bè cho 1 tài khoản
         if path == "/api/scan":
             data = self.read_json_body()
-            acc_id = data.get("account_id", ACTIVE_ACCOUNT_ID)
+            scope_acc = self.get_scope_account()
+            acc_id = scope_acc["id"] if scope_acc else data.get("account_id", ACTIVE_ACCOUNT_ID)
+            if self.deny_out_of_scope(acc_id):
+                return
             acc = get_account(acc_id)
             acc_name = acc.get("name", "Tài khoản") if acc else "Tài khoản"
             ok, msg = run_background_task(f"Quét bạn bè ({acc_name})", task_scan_friends, acc_id)
@@ -725,7 +884,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
         # API: Start Sequential Streak Send (hỗ trợ chọn nhiều tài khoản)
         if path == "/api/send":
             data = self.read_json_body()
+            scope_acc = self.get_scope_account()
+            if self.deny_body_scope_mismatch():
+                return
             account_ids = data.get("account_ids")
+            if scope_acc:
+                account_ids = [scope_acc["id"]]
             if not account_ids:
                 # Mặc định lấy các tài khoản được tick chọn
                 accounts = load_accounts()
@@ -759,7 +923,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
         # API: Login & Save Cookies cho 1 tài khoản
         if path == "/api/login-cookies":
             data = self.read_json_body()
-            acc_id = data.get("account_id", ACTIVE_ACCOUNT_ID)
+            scope_acc = self.get_scope_account()
+            acc_id = scope_acc["id"] if scope_acc else data.get("account_id", ACTIVE_ACCOUNT_ID)
+            if self.deny_out_of_scope(acc_id):
+                return
             acc = get_account(acc_id)
             acc_name = acc.get("name", "Tài khoản") if acc else "Tài khoản"
             ok, msg = run_background_task(f"Đăng nhập TikTok ({acc_name})", task_login_and_save_cookies, acc_id)
@@ -772,7 +939,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self.send_json({"success": False, "error": "Không thể xóa dữ liệu khi đang có tác vụ chạy!"}, 400)
                 return
             data = self.read_json_body()
-            acc_id = data.get("account_id")
+            scope_acc = self.get_scope_account()
+            if scope_acc:
+                acc_id = scope_acc["id"]
+            else:
+                acc_id = data.get("account_id")
+            if self.deny_out_of_scope(acc_id):
+                return
             reset_account_data(acc_id)
             self.send_json({"success": True})
             return

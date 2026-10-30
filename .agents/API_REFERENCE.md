@@ -15,9 +15,11 @@ Lấy trạng thái tổng quan hệ thống, trạng thái tác vụ nền và 
   "is_running": false,
   "task_name": "",
   "active_account_id": "acc_1791483598488",
+  "page_slug": null,
   "accounts": [
     {
       "id": "acc_1791483598488",
+      "slug": "tai-khoan-1",
       "name": "Tài khoản 1",
       "username": "hoathang34",
       "last_login": "14:20:15 12/10/2026",
@@ -45,6 +47,7 @@ Lấy danh sách các tài khoản trong `accounts.json`.
 Lấy cấu hình riêng của một tài khoản.
 * **Query Params:**
   * `account_id` *(tùy chọn)*: ID của tài khoản. Nếu không truyền, mặc định lấy theo `ACTIVE_ACCOUNT_ID`.
+  * `scope_slug` *(tùy chọn)*: Slug tài khoản, tự động gắn bởi trang `/account/<slug>/` để giới hạn phạm vi. Xem mục 4.
 * **Response Output:**
 ```json
 {
@@ -301,3 +304,24 @@ Xóa trắng cookies, danh sách bạn bè và khôi phục cài đặt mặc đ
 Xóa trắng bộ đệm log trên server và khung hiển thị log trên web.
 * **Request Body:** `{}`
 * **Response Output:** `{"success": true}`
+
+---
+
+## 5. Trang Cài Đặt Riêng Theo Tài Khoản (Scoped Page)
+
+### 5.1. `GET /account/<slug>/`
+Trả về chính `web/index.html`, nhưng frontend phát hiện URL dạng này (`IS_SCOPED`) và chuyển sang chế độ trang riêng:
+* Ẩn bảng danh sách tài khoản, nút thêm/chọn tất cả, bộ chuyển tài khoản, nút "Áp dụng cho TẤT CẢ", nút xóa tài khoản.
+* Thanh chạy tuần tự được thay bằng nút "Chạy gửi streak cho tài khoản này".
+* Mọi request `/api/*` tự động được gắn `scope_slug=<slug>` (query string và/hoặc JSON body).
+* `/account/<slug>` (thiếu dấu `/`) trả về `301` chuyển hướng sang `/account/<slug>/`.
+* Slug không tồn tại trả về `404 Not Found`.
+
+### 5.2. Cơ chế giới hạn phạm vi (`scope_slug`)
+Backend đọc `scope_slug` từ query string hoặc JSON body (`DashboardHandler.get_scope_account`). Khi có scope hợp lệ:
+* `GET /api/status` và `GET /api/accounts` chỉ trả về đúng tài khoản đó (`page_slug` được điền trong response).
+* `GET/POST /api/config`, `/api/friends*`, `/api/scan`, `/api/login-cookies`, `/api/reset-data` luôn nhắm vào tài khoản trong scope, bỏ qua `account_id` do client gửi.
+* `scope_slug` không tồn tại → `404` với `{"error": "Tài khoản không tồn tại"}`.
+* Gửi kèm `account_id` / `account_ids` trỏ tới tài khoản khác → `403` (`deny_body_scope_mismatch`).
+* Các thao tác toàn cục bị chặn `403` (`deny_if_scoped`): `POST /api/accounts/create`, `/api/accounts/delete`, `/api/accounts/toggle-all`, `POST /api/config` với `apply_to_all: true`.
+* `POST /api/accounts/update` (đổi tên) trả thêm `slug` mới và `redirect` (`/account/<slug-mới>/`) để frontend chuyển URL khi đổi tên ở trang riêng.

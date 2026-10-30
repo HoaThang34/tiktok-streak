@@ -494,16 +494,16 @@
     </header>
 
     <!-- SECTION 1: QUẢN LÝ DANH SÁCH TÀI KHOẢN (MULTI-ACCOUNT MANAGER) -->
-    <section class="card">
+    <section class="card" id="accountsSection">
       <div class="card-header">
         <div>
-          <h2 class="card-title">
+          <h2 class="card-title" id="accountsSectionTitle">
             <svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             Quản Lý Danh Sách Tài Khoản TikTok
           </h2>
-          <p class="card-subtitle">Mỗi tài khoản lưu trữ cookies, mẫu tin nhắn streak và danh sách bạn bè riêng biệt</p>
+          <p class="card-subtitle" id="accountsSectionSubtitle">Mỗi tài khoản lưu trữ cookies, mẫu tin nhắn streak và danh sách bạn bè riêng biệt</p>
         </div>
-        <div style="display: flex; gap: 8px;">
+        <div style="display: flex; gap: 8px;" id="accountHeaderActions">
           <button class="btn btn-secondary btn-sm" onclick="toggleAllAccounts(true)">
             <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
             Chọn tất cả để chạy
@@ -520,7 +520,7 @@
       </div>
 
       <!-- Accounts Table -->
-      <div class="table-container">
+      <div class="table-container" id="accountsTableContainer">
         <table>
           <thead>
             <tr>
@@ -575,7 +575,7 @@
               <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
               Cài Đặt Riêng: <span id="lblActiveAccountName" style="color: var(--blue-fg);">Tài khoản 1</span>
             </h2>
-            <p class="card-subtitle">Cấu hình mẫu tin nhắn, khoảng cách và chế độ chạy riêng cho tài khoản này</p>
+            <p class="card-subtitle">Cấu hình mẫu tin nhắn, khoảng cách và chế độ chạy riêng cho tài khoản này <span id="lblActiveAccountSlug" style="font-family: ui-monospace, monospace; color: var(--blue-fg);"></span></p>
           </div>
           <div>
             <select id="selectSwitchAccount" class="form-select" style="width: auto; padding: 4px 8px; font-size: 12px;" onchange="switchActiveAccount(this.value)">
@@ -904,6 +904,94 @@
     let isTaskRunning = false;
     let currentTaskName = "";
 
+    // --- CHẾ ĐỘ TRANG CÀI ĐẶT RIÊNG (/account/<slug>/) ---
+    const SCOPE_SLUG = (function () {
+      const m = window.location.pathname.match(/^\/account\/([^/]+)\/?$/);
+      return m ? decodeURIComponent(m[1]) : null;
+    })();
+    const IS_SCOPED = !!SCOPE_SLUG;
+
+    // Gắn scope_slug vào mọi request /api/ để backend giới hạn phạm vi tài khoản
+    (function installScopeInterceptor() {
+      if (!IS_SCOPED) return;
+      const nativeFetch = window.fetch.bind(window);
+      window.fetch = function (input, init) {
+        let url = typeof input === "string" ? input : ((input && input.url) || "");
+        if (url.indexOf("/api/") === 0 && url.indexOf("scope_slug=") === -1) {
+          url += (url.indexOf("?") === -1 ? "?" : "&") + "scope_slug=" + encodeURIComponent(SCOPE_SLUG);
+        }
+        if (init && typeof init.body === "string") {
+          try {
+            const obj = JSON.parse(init.body);
+            if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+              obj.scope_slug = SCOPE_SLUG;
+              init = Object.assign({}, init, { body: JSON.stringify(obj) });
+            }
+          } catch (e) { /* body không phải JSON, giữ nguyên */ }
+        }
+        return nativeFetch(url, init);
+      };
+    })();
+
+    function applyScopedLayout() {
+      if (!IS_SCOPED) return;
+      const accName = accountsData[0] ? accountsData[0].name : "tài khoản này";
+      document.title = `Cài đặt: ${accName} - TikTok Streak Manager`;
+      const subtitle = document.querySelector(".brand-subtitle");
+      if (subtitle) {
+        subtitle.textContent = "Trang cài đặt riêng — chỉ hiển thị và thao tác trên một tài khoản";
+      }
+
+      // Đổi tiêu đề khu vực quản lý thành thông tin tài khoản đang mở
+      const sectionTitle = document.getElementById("accountsSectionTitle");
+      if (sectionTitle) {
+        sectionTitle.innerHTML =
+          '<svg class="icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' +
+          " Tài khoản: " + escapeHtml(accName);
+      }
+      const sectionSubtitle = document.getElementById("accountsSectionSubtitle");
+      if (sectionSubtitle && accountsData[0]) {
+        sectionSubtitle.textContent =
+          `Đường dẫn riêng: /account/${accountsData[0].slug}/ — không hiển thị tài khoản khác`;
+      }
+
+      const tableEl = document.getElementById("accountsTableContainer");
+      if (tableEl) tableEl.style.display = "none";
+      const actionsEl = document.getElementById("accountHeaderActions");
+      if (actionsEl) actionsEl.style.display = "none";
+      const runnerEl = document.querySelector(".runner-bar");
+      if (runnerEl) {
+        runnerEl.innerHTML =
+          '<div class="runner-info"><div>Chế độ trang riêng: chỉ chạy và cấu hình cho <strong>' +
+          escapeHtml(accName) +
+          '</strong>.</div></div>' +
+          '<div class="runner-actions">' +
+          '<button id="btnStartBatch" class="btn btn-primary btn-lg" onclick="startSequentialRun()">' +
+          '<svg class="icon icon-lg" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>' +
+          '<span id="txtStartBatch">Chạy gửi streak cho tài khoản này</span></button>' +
+          '<button id="btnStopBatch" class="btn btn-destructive btn-lg" onclick="stopCurrentTask()" disabled>' +
+          '<svg class="icon icon-lg" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>' +
+          "Dừng lại khẩn cấp</button></div>";
+      }
+      // Ẩn bộ chuyển tài khoản & nút áp dụng toàn bộ / xóa tài khoản
+      const switcher = document.getElementById("selectSwitchAccount");
+      if (switcher) switcher.style.display = "none";
+      const applyAllBtn = document.querySelector('button[onclick="saveConfigToAllAccounts()"]');
+      if (applyAllBtn) applyAllBtn.style.display = "none";
+      const deleteBtn = document.getElementById("btnDeleteCurrentAccount");
+      if (deleteBtn) deleteBtn.style.display = "none";
+      // Thêm link quay về trang tổng
+      const cardHeader = document.querySelector(".card-header .card-subtitle");
+      if (cardHeader && !document.getElementById("backToDashboardLink")) {
+        const a = document.createElement("a");
+        a.id = "backToDashboardLink";
+        a.href = "/";
+        a.textContent = "← Quay về trang quản lý tổng";
+        a.style.cssText = "display:inline-block;margin-top:6px;font-size:12px;color:var(--blue-fg);text-decoration:none;";
+        cardHeader.parentNode.appendChild(a);
+      }
+    }
+
     // Initialization
     document.addEventListener("DOMContentLoaded", () => {
       const syncChk = document.getElementById("chkSyncMessageOnRun");
@@ -942,6 +1030,8 @@
           activeAccountId = data.active_account_id || (accountsData[0] ? accountsData[0].id : "");
         }
 
+        if (initial) applyScopedLayout();
+
         renderHeaderStats();
         renderAccountsTable();
         renderAccountSwitcher();
@@ -976,9 +1066,12 @@
 
     function renderHeaderStats() {
       const selected = accountsData.filter(a => a.enabled !== false).length;
-      document.getElementById("txtAccountsCount").textContent = `${accountsData.length} tài khoản (${selected} đã chọn)`;
-      document.getElementById("selectedAccountsCount").textContent = selected;
-      document.getElementById("totalAccountsCount").textContent = accountsData.length;
+      const countEl = document.getElementById("txtAccountsCount");
+      if (countEl) countEl.textContent = `${accountsData.length} tài khoản (${selected} đã chọn)`;
+      const selEl = document.getElementById("selectedAccountsCount");
+      if (selEl) selEl.textContent = selected;
+      const totEl = document.getElementById("totalAccountsCount");
+      if (totEl) totEl.textContent = accountsData.length;
     }
 
     function renderAccountsTable() {
@@ -1052,6 +1145,10 @@
                 <svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
                 Cookie / Đăng nhập
               </button>
+              <a class="btn btn-outline-blue btn-sm" href="/account/${encodeURIComponent(acc.slug || acc.id)}/" target="_blank" rel="noopener" title="Mở trang cài đặt riêng của tài khoản này (không thấy tài khoản khác)">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                Trang riêng
+              </a>
               <button class="btn ${isActive ? 'btn-primary' : 'btn-outline-blue'} btn-sm" title="Chỉnh sửa cài đặt & xem danh sách bạn bè" onclick="switchActiveAccount('${acc.id}')">
                 <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 ${isActive ? 'Đang xem' : 'Quản lý'}
@@ -1090,6 +1187,11 @@
       const currentAcc = accountsData.find(a => a.id === activeAccountId) || accountsData[0] || { name: "Tài khoản 1" };
       document.getElementById("lblActiveAccountName").textContent = currentAcc.name;
       document.getElementById("lblFriendsAccountName").textContent = currentAcc.name;
+      // Hiển thị đường dẫn trang riêng của tài khoản đang chọn
+      const slugEl = document.getElementById("lblActiveAccountSlug");
+      if (slugEl) {
+        slugEl.textContent = currentAcc.slug ? `/account/${currentAcc.slug}/` : "";
+      }
     }
 
     // --- CONFIG STATE & AUTO-SAVE ---
@@ -1699,12 +1801,18 @@
         return;
       }
       try {
-        await fetch("/api/accounts/update", {
+        const res = await fetch("/api/accounts/update", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: accId, name: newName })
         });
+        const data = await res.json();
         closeRenameAccountModal();
+        // Ở trang riêng, đổi tên làm đổi slug -> chuyển sang URL mới
+        if (IS_SCOPED && data.redirect && data.redirect !== window.location.pathname) {
+          window.location.href = data.redirect;
+          return;
+        }
         await fetchStatus(false);
       } catch (e) {
         alert("Lỗi đổi tên: " + e);

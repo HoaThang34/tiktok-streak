@@ -50,6 +50,7 @@ Chứa danh bạ toàn bộ tài khoản TikTok mà người dùng đã tạo tr
 [
   {
     "id": "acc_1791483598488",
+    "slug": "tai-khoan-chinh",
     "name": "Tài khoản chính",
     "username": "hoathang34",
     "last_login": "14:20:15 12/10/2026",
@@ -62,6 +63,7 @@ Chứa danh bạ toàn bộ tài khoản TikTok mà người dùng đã tạo tr
 
 * **Quy ước trường dữ liệu tĩnh (Lưu trong file):**
   * `id` *(string)*: Khóa chính định danh duy nhất (VD: `acc_1791483598488`).
+  * `slug` *(string)*: Định danh thân thiện cho URL trang riêng (`/account/<slug>/`). Sinh tự động từ `name` bằng `slugify_name()` (bỏ dấu tiếng Việt, chữ thường, nối bằng `-`), chống trùng bằng `make_unique_slug()` (thêm `-2`, `-3`...). Tự cập nhật khi đổi tên trong `update_account()`.
   * `name` *(string)*: Tên gợi nhớ do người dùng đặt (VD: `Tài khoản chính`).
   * `username` *(string)*: TikTok handle trích xuất tự động từ profile (không kèm `@`).
   * `last_login` *(string)*: Chuỗi thời gian lần cuối đăng nhập/nạp cookie.
@@ -75,7 +77,7 @@ Chứa danh bạ toàn bộ tài khoản TikTok mà người dùng đã tạo tr
   * `friends_count` *(int)*: Tổng số bạn bè trong `friends.json` của tài khoản này.
   * `selected_friends_count` *(int)*: Số bạn bè đang có `enabled == True`.
 
-> **LƯU Ý QUAN TRỌNG:** Trong hàm `save_accounts()` của `utils.py`, các trường động (`has_cookies`, `cookies_count`, `friends_count`, `selected_friends_count`) bị lọc bỏ để tránh làm rác file `accounts.json`. Nếu bạn thêm trường mới vào tài khoản, **BẮT BUỘC** phải khai báo trường đó trong `save_accounts()`.
+> **LƯU Ý QUAN TRỌNG:** Trong hàm `save_accounts()` của `utils.py`, các trường động (`has_cookies`, `cookies_count`, `friends_count`, `selected_friends_count`) bị lọc bỏ để tránh làm rác file `accounts.json`. Nếu bạn thêm trường mới vào tài khoản, **BẮT BUỘC** phải khai báo trường đó trong `save_accounts()`. Trường `slug` cũng phải nằm trong danh sách này (đã khai báo) — nếu thiếu, URL trang riêng sẽ bị tính lại từ tên mỗi lần tải.
 
 ---
 
